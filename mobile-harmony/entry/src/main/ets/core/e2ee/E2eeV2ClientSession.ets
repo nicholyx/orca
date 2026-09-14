@@ -12,7 +12,9 @@ import { decodeUtf8, encodeUtf8 } from '../bytes/Utf8';
 import { BoxKeyPair, boxBefore, boxKeyPair } from '../crypto/Box';
 import { RandomBytes } from '../crypto/RandomSource';
 import {
+  E2eeV2DirectHelloArgs,
   E2eeV2Hello,
+  E2eeV2RelayHelloArgs,
   E2eeV2ValidatedHandshake,
   buildDirectHello,
   buildRelayHello,
@@ -26,10 +28,12 @@ import {
   E2EE_V2_DIRECTION_MOBILE_TO_DESKTOP,
   E2EE_V2_PAYLOAD_KIND_BINARY,
   E2EE_V2_PAYLOAD_KIND_TEXT,
+  E2eeV2FrameOpenArgs,
+  E2eeV2FrameSealArgs,
   openE2eeV2Frame,
   sealE2eeV2Frame
 } from './E2eeV2Framing';
-import { E2eeV2KeySchedule, deriveE2eeV2KeySchedule } from './E2eeV2KeySchedule';
+import { E2eeV2KeySchedule, E2eeV2KeyScheduleArgs, deriveE2eeV2KeySchedule } from './E2eeV2KeySchedule';
 
 const NONCE_BYTES = 32;
 
@@ -69,17 +73,21 @@ export class E2eeV2ClientSession {
     const clientPublicKeyB64 = encodePublicKeyB64(keyPair.publicKey);
     const clientNonceB64 = encodeBase64(clientNonce);
     const relayHostId = options.relayHostId;
-    const hello: E2eeV2Hello =
-      options.transport === 'relay' && relayHostId !== undefined
-        ? buildRelayHello({
-            clientPublicKeyB64: clientPublicKeyB64,
-            clientNonceB64: clientNonceB64,
-            relayHostId: relayHostId
-          })
-        : buildDirectHello({
-            clientPublicKeyB64: clientPublicKeyB64,
-            clientNonceB64: clientNonceB64
-          });
+    let hello: E2eeV2Hello;
+    if (options.transport === 'relay' && relayHostId !== undefined) {
+      const relayArgs: E2eeV2RelayHelloArgs = {
+        clientPublicKeyB64: clientPublicKeyB64,
+        clientNonceB64: clientNonceB64,
+        relayHostId: relayHostId
+      };
+      hello = buildRelayHello(relayArgs);
+    } else {
+      const directArgs: E2eeV2DirectHelloArgs = {
+        clientPublicKeyB64: clientPublicKeyB64,
+        clientNonceB64: clientNonceB64
+      };
+      hello = buildDirectHello(directArgs);
+    }
 
     // The pinned key arrives as canonical base64 in the pairing offer; decode it
     // eagerly so a malformed offer fails here rather than at the first frame.
@@ -107,12 +115,13 @@ export class E2eeV2ClientSession {
     if (!publicKeysEqual(handshake.desktopPublicKey, this.pinnedDesktopPublicKey)) {
       return false;
     }
-    this.schedule = deriveE2eeV2KeySchedule({
+    const scheduleArgs: E2eeV2KeyScheduleArgs = {
       sharedSecret: boxBefore(this.clientSecretKey, this.pinnedDesktopPublicKey),
       transcript: handshake.transcript,
       clientNonce: handshake.clientNonce,
       desktopNonce: handshake.desktopNonce
-    });
+    };
+    this.schedule = deriveE2eeV2KeySchedule(scheduleArgs);
     this.transcriptHashB64Value = encodeBase64(this.schedule.transcriptHash);
     return true;
   }
@@ -156,14 +165,15 @@ export class E2eeV2ClientSession {
     if (schedule === null) {
       return null;
     }
-    const plaintext = openE2eeV2Frame({
+    const openArgs: E2eeV2FrameOpenArgs = {
       frame: frame,
       key: schedule.desktopToMobileKey,
       sessionId: schedule.sessionId,
       direction: E2EE_V2_DIRECTION_DESKTOP_TO_MOBILE,
       payloadKind: payloadKind,
       expectedCounter: this.inboundCounter
-    });
+    };
+    const plaintext = openE2eeV2Frame(openArgs);
     if (plaintext !== null) {
       this.inboundCounter++;
     }
@@ -175,14 +185,15 @@ export class E2eeV2ClientSession {
     if (schedule === null) {
       throw new Error('E2EE v2 ready has not been accepted');
     }
-    const frame = sealE2eeV2Frame({
+    const sealArgs: E2eeV2FrameSealArgs = {
       payload: plaintext,
       key: schedule.mobileToDesktopKey,
       sessionId: schedule.sessionId,
       direction: E2EE_V2_DIRECTION_MOBILE_TO_DESKTOP,
       payloadKind: payloadKind,
       counter: this.outboundCounter
-    });
+    };
+    const frame = sealE2eeV2Frame(sealArgs);
     this.outboundCounter++;
     return frame;
   }

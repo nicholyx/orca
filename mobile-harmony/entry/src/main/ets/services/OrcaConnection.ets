@@ -29,7 +29,7 @@ import {
 } from '../core/rpc/TerminalStreamRouter';
 import { asArray, asRecord, asString } from '../core/json/JsonValue';
 import { AssetDeviceTokenStore } from '../platform/AssetDeviceTokenStore';
-import { buildDirectClientOptions } from '../platform/DirectRpcSocketFactory';
+import { DirectClientArgs, buildDirectClientOptions } from '../platform/DirectRpcSocketFactory';
 import { harmonyRandomBytes, newHostId } from '../platform/HarmonyRandom';
 import { PreferencesHostMetadataStore } from '../platform/PreferencesHostMetadataStore';
 import {
@@ -266,15 +266,16 @@ export class OrcaConnection {
     this.currentHost = target;
     this.logRows = [];
     this.terminalLines = [];
-    const options = buildDirectClientOptions({
+    const options: DirectClientArgs = {
       endpoint: target.endpoint,
       deviceToken: target.deviceToken,
       desktopPublicKeyB64: target.publicKeyB64,
       random: harmonyRandomBytes,
       onStateChange: (state: string) => this.handleStateChange(state),
       onLog: (entry: ConnectionLogEntry) => this.handleLog(entry)
-    });
-    this.client = new RpcClient(options);
+    };
+    const clientOptions = buildDirectClientOptions(options);
+    this.client = new RpcClient(clientOptions);
     this.state = this.client.getState();
     this.emit();
   }

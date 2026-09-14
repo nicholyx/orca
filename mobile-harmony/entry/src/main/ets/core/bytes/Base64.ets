@@ -19,6 +19,8 @@ const MINUS_CODE = 0x2d;
 const UNDERSCORE_CODE = 0x5f;
 
 let DECODE_TABLE: Int16Array | null = null;
+// ArkTS bans indexing a string, so encoding goes through a code table too.
+let ENCODE_TABLE: Uint8Array | null = null;
 
 function decodeTable(): Int16Array {
   if (DECODE_TABLE === null) {
@@ -32,6 +34,17 @@ function decodeTable(): Int16Array {
     DECODE_TABLE = table;
   }
   return DECODE_TABLE;
+}
+
+function encodeTable(): Uint8Array {
+  if (ENCODE_TABLE === null) {
+    const table = new Uint8Array(64);
+    for (let index = 0; index < table.length; index++) {
+      table[index] = STANDARD_ALPHABET.charCodeAt(index);
+    }
+    ENCODE_TABLE = table;
+  }
+  return ENCODE_TABLE;
 }
 
 function isBase64Code(code: number, allowUrlSafe: boolean): boolean {
@@ -55,27 +68,28 @@ function isBase64Code(code: number, allowUrlSafe: boolean): boolean {
 
 /** Standard base64 with padding — byte-for-byte equal to `btoa(binary)`. */
 export function encodeBase64(bytes: Uint8Array): string {
+  const table = encodeTable();
   let out = '';
   let index = 0;
   while (index + 2 < bytes.length) {
     const chunk = (bytes[index] << 16) | (bytes[index + 1] << 8) | bytes[index + 2];
-    out += STANDARD_ALPHABET[(chunk >> 18) & 0x3f];
-    out += STANDARD_ALPHABET[(chunk >> 12) & 0x3f];
-    out += STANDARD_ALPHABET[(chunk >> 6) & 0x3f];
-    out += STANDARD_ALPHABET[chunk & 0x3f];
+    out += String.fromCharCode(table[(chunk >> 18) & 0x3f]);
+    out += String.fromCharCode(table[(chunk >> 12) & 0x3f]);
+    out += String.fromCharCode(table[(chunk >> 6) & 0x3f]);
+    out += String.fromCharCode(table[chunk & 0x3f]);
     index += 3;
   }
   const remaining = bytes.length - index;
   if (remaining === 1) {
     const chunk = bytes[index] << 16;
-    out += STANDARD_ALPHABET[(chunk >> 18) & 0x3f];
-    out += STANDARD_ALPHABET[(chunk >> 12) & 0x3f];
+    out += String.fromCharCode(table[(chunk >> 18) & 0x3f]);
+    out += String.fromCharCode(table[(chunk >> 12) & 0x3f]);
     out += '==';
   } else if (remaining === 2) {
     const chunk = (bytes[index] << 16) | (bytes[index + 1] << 8);
-    out += STANDARD_ALPHABET[(chunk >> 18) & 0x3f];
-    out += STANDARD_ALPHABET[(chunk >> 12) & 0x3f];
-    out += STANDARD_ALPHABET[(chunk >> 6) & 0x3f];
+    out += String.fromCharCode(table[(chunk >> 18) & 0x3f]);
+    out += String.fromCharCode(table[(chunk >> 12) & 0x3f]);
+    out += String.fromCharCode(table[(chunk >> 6) & 0x3f]);
     out += '=';
   }
   return out;

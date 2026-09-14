@@ -13,7 +13,15 @@ import { OrcaColors, OrcaRadius, OrcaSpace, OrcaType, toneColor } from '../theme
 
 @Component
 export struct HostListView {
-  connection: OrcaConnection;
+  connection: OrcaConnection | null = null;
+
+  /** Fail-closed access: the view is inert until the page injects a connection. */
+  private conn(): OrcaConnection {
+    if (this.connection === null) {
+      throw new Error('HostListView used before its connection was injected');
+    }
+    return this.connection;
+  }
   onOpenTerminal: () => void = () => {};
 
   @State revision: number = 0;
@@ -25,7 +33,7 @@ export struct HostListView {
 
   aboutToAppear(): void {
     this.refresh();
-    this.unsubscribe = this.connection.onChange(() => {
+    this.unsubscribe = this.conn().onChange(() => {
       this.refresh();
     });
   }
@@ -38,8 +46,8 @@ export struct HostListView {
   }
 
   private refresh(): void {
-    this.hosts = this.connection.hostRows();
-    const snapshot = this.connection.snapshot();
+    this.hosts = this.conn().hostRows();
+    const snapshot = this.conn().snapshot();
     this.stateLabel = snapshot.label;
     this.stateTone = snapshot.tone;
     this.revision++;
@@ -55,7 +63,7 @@ export struct HostListView {
       ]
     }).then((result: promptAction.ShowDialogSuccessResponse) => {
       if (result.index === 1) {
-        this.connection.removeHost(row.id).catch((error: Object) => {
+        this.conn().removeHost(row.id).catch((error: Object) => {
           promptAction.showToast({ message: `Could not remove host: ${String(error)}` });
         });
       }
@@ -151,8 +159,8 @@ export struct HostListView {
     .borderRadius(OrcaRadius.md)
     .border({ width: 1, color: row.isActive ? OrcaColors.ring : OrcaColors.border })
     .onClick(() => {
-      this.connection.connect(row.id);
-      const snapshot = this.connection.snapshot();
+      this.conn().connect(row.id);
+      const snapshot = this.conn().snapshot();
       this.stateLabel = snapshot.label;
       this.stateTone = snapshot.tone;
       this.onOpenTerminal();

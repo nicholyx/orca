@@ -76,11 +76,17 @@ export interface E2eeV2ValidatedHandshake {
   transcript: Uint8Array;
 }
 
-/** Builds an `e2ee_hello` document for a direct (non-relay) transport. */
-export function buildDirectHello(args: {
+export interface E2eeV2DirectHelloArgs {
   clientPublicKeyB64: string;
   clientNonceB64: string;
-}): E2eeV2Hello {
+}
+
+export interface E2eeV2RelayHelloArgs extends E2eeV2DirectHelloArgs {
+  relayHostId: string;
+}
+
+/** Builds an `e2ee_hello` document for a direct (non-relay) transport. */
+export function buildDirectHello(args: E2eeV2DirectHelloArgs): E2eeV2Hello {
   const capabilities: E2eeV2Capabilities = { framing: [2], payloadKinds: ['text', 'binary'] };
   const context: E2eeV2HelloContext = {
     protocol: MOBILE_E2EE_V2_PROTOCOL,
@@ -100,11 +106,7 @@ export function buildDirectHello(args: {
 }
 
 /** Builds an `e2ee_hello` document for a relay transport. */
-export function buildRelayHello(args: {
-  clientPublicKeyB64: string;
-  clientNonceB64: string;
-  relayHostId: string;
-}): E2eeV2Hello {
+export function buildRelayHello(args: E2eeV2RelayHelloArgs): E2eeV2Hello {
   const capabilities: E2eeV2Capabilities = { framing: [2], payloadKinds: ['text', 'binary'] };
   const context: E2eeV2HelloContext = {
     protocol: MOBILE_E2EE_V2_PROTOCOL,
@@ -247,7 +249,7 @@ export function validateReady(
  * length-prefixed so a field boundary cannot be shifted by attacker-controlled
  * content.
  */
-export function encodeTranscript(args: {
+export interface E2eeV2TranscriptArgs {
   hello: E2eeV2Hello;
   ready: E2eeV2Ready;
   readyContext: E2eeV2DecodedContext;
@@ -255,7 +257,9 @@ export function encodeTranscript(args: {
   desktopPublicKey: Uint8Array;
   clientNonce: Uint8Array;
   desktopNonce: Uint8Array;
-}): Uint8Array {
+}
+
+export function encodeTranscript(args: E2eeV2TranscriptArgs): Uint8Array {
   const helloContext: E2eeV2HelloContext = args.hello.context;
   const helloRelayHostId =
     helloContext.relayHostId === undefined ? '' : helloContext.relayHostId;
@@ -446,7 +450,8 @@ function parseContext(value: Object | null | undefined): E2eeV2DecodedContext | 
     if (typeof relayValue !== 'string' || !new RegExp(BASE64URL_16_PATTERN).test(relayValue)) {
       return null;
     }
-    relayHostId = relayValue;
+    // typeof narrowed above; ArkTS still sees the Record value as Object.
+    relayHostId = String(relayValue);
   }
   const context: E2eeV2DecodedContext = {
     protocol: MOBILE_E2EE_V2_PROTOCOL,

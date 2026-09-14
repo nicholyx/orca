@@ -14,7 +14,15 @@ import { OrcaColors, OrcaRadius, OrcaSpace, OrcaType } from '../theme/ThemeToken
 
 @Component
 export struct PairView {
-  connection: OrcaConnection;
+  connection: OrcaConnection | null = null;
+
+  /** Fail-closed access: the view is inert until the page injects a connection. */
+  private conn(): OrcaConnection {
+    if (this.connection === null) {
+      throw new Error('PairView used before its connection was injected');
+    }
+    return this.connection;
+  }
   onPaired: () => void = () => {};
 
   @State input: string = '';
@@ -33,7 +41,7 @@ export struct PairView {
     }
     this.busy = true;
     this.error = '';
-    const outcome = await this.connection.pairFromInput(text);
+    const outcome = await this.conn().pairFromInput(text);
     this.busy = false;
     if (outcome.ok) {
       this.input = '';

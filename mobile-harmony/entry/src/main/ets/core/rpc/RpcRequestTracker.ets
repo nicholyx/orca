@@ -23,7 +23,7 @@ export interface SendRequestOptions {
 
 interface PendingRequest {
   resolve: (response: RpcResponse) => void;
-  reject: (error: Error) => void;
+  reject: (error: Object) => void;
   timer: number;
 }
 
@@ -112,7 +112,7 @@ export class RpcRequestTracker {
     params: Object | undefined,
     timeoutMs: number
   ): Promise<RpcResponse> {
-    return new Promise<RpcResponse>((resolve: (value: RpcResponse) => void, reject: (error: Error) => void) => {
+    return new Promise<RpcResponse>((resolve: (value: RpcResponse) => void, reject: (error: Object) => void) => {
       const id = this.nextId();
       const timer = setTimeout(() => {
         this.pending.delete(id);

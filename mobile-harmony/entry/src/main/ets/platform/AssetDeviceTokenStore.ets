@@ -75,7 +75,10 @@ export class AssetDeviceTokenStore implements HostDeviceTokenStore {
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: every rejection from the Asset Store is a BusinessError carrying a numeric code.
       const code = (error as BusinessError).code;
       if (code !== ASSET_ERROR_DUPLICATED) {
-        throw error;
+        // ArkTS only throws Error instances; BusinessError is an interface.
+        throw error instanceof Error
+          ? error
+          : new Error(`asset add failed with code ${code}`);
       }
     }
     // Re-pairing replaces the credential in place; remove-then-add is the only

@@ -13,12 +13,22 @@
  */
 import { RandomBytes } from '../core/crypto/RandomSource';
 import { E2eeV2ClientSession } from '../core/e2ee/E2eeV2ClientSession';
+import { ConnectionLogEntry } from '../core/rpc/ConnectionLog';
 import { RpcClientOptions, RpcSocketSessionFactory } from '../transport/RpcClient';
 import { RpcSocketPreflight, RpcSocketSession } from '../transport/RpcSocketSession';
 import { HarmonyWebSocketHandle } from './HarmonyWebSocketHandle';
 
 /** The E2EE v2 hello's transport discriminator for a direct (non-relay) link. */
 export const E2EE_V2_TRANSPORT_DIRECT = 'direct';
+
+export interface DirectClientArgs {
+  endpoint: string;
+  deviceToken: string;
+  desktopPublicKeyB64: string;
+  random: RandomBytes;
+  onStateChange: ((state: string) => void) | null;
+  onLog: ((entry: ConnectionLogEntry) => void) | null;
+}
 
 export class DirectRpcSocketFactory implements RpcSocketSessionFactory {
   private readonly random: RandomBytes;
@@ -40,14 +50,7 @@ export class DirectRpcSocketFactory implements RpcSocketSessionFactory {
 }
 
 /** Convenience: the client options for a direct link to one paired host. */
-export function buildDirectClientOptions(args: {
-  endpoint: string;
-  deviceToken: string;
-  desktopPublicKeyB64: string;
-  random: RandomBytes;
-  onStateChange: ((state: string) => void) | null;
-  onLog: RpcClientOptions['onLog'];
-}): RpcClientOptions {
+export function buildDirectClientOptions(args: DirectClientArgs): RpcClientOptions {
   return {
     endpoint: args.endpoint,
     deviceToken: args.deviceToken,

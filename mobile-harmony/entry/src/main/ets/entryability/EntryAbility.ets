@@ -39,11 +39,13 @@ export default class EntryAbility extends UIAbility {
       }
       // The app is dark-only: the palette in ThemeTokens has no light variant,
       // and forcing it here keeps the system light theme from washing out the
-      // terminal surface.
+      // terminal surface. setWindowBackgroundColor is synchronous on this API.
       const mainWindow = windowStage.getMainWindowSync();
-      mainWindow
-        .setWindowBackgroundColor('#0a0a0a')
-        .catch((error: Object) => hilog.warn(DOMAIN, TAG, 'background set failed: %{public}s', String(error)));
+      try {
+        mainWindow.setWindowBackgroundColor('#0a0a0a');
+      } catch (error) {
+        hilog.warn(DOMAIN, TAG, 'background set failed: %{public}s', String(error));
+      }
     });
   }
 

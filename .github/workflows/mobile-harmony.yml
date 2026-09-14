@@ -34,12 +34,6 @@ env:
   # Turned on by four secrets — see build-hap "Materialize signing material".
   # Until then the HAP is unsigned and the summary explains the one-time setup.
   SIGNING_READY: ${{ secrets.HARMONY_SIGNING_P12 != '' && secrets.HARMONY_SIGNING_CER != '' && secrets.HARMONY_SIGNING_P7B != '' && secrets.HARMONY_SIGNING_P12_PASSWORD != '' }}
-  # Why: pinned toolchain mirror — Huawei's own download wall needs a dev
-  # login, which a runner cannot do. The zip is version-pinned in the URL and
-  # its SHA-256 is recorded in the run summary for audit. Swap to the official
-  # distribution if it ever gains an unauthenticated direct link.
-  CLT_URL: https://github.com/Okysu/harmony-auto-build/releases/download/commandline-tools-linux-x64-6.1.0.816/commandline-tools-linux-x64-6.1.0.816.zip
-  CLT_VERSION: 6.1.0.816
 
 jobs:
   # The full host-side verification pipeline: three unit-vs-reference harnesses,
@@ -83,61 +77,27 @@ jobs:
         working-directory: mobile-harmony/tools/interop
 
   # Test gate first: a red verify job means no package is produced.
+  #
+  # Why a container: Huawei's own toolchain download needs a developer login a
+  # runner cannot perform, and the version-pinned zip mirror tops out at
+  # hvigor modelVersion 6.1.0 — the project's modelVersion 26.0.0 needs the
+  # API 26 SDK. This public image pins command-line-tools 26.0.0.461 together
+  # with the matching HarmonyOS 26.0.0 SDK and ships hvigor/ohpm/node ready
+  # to use (see DaLongZhuaZi/harmonyos-ci). In-container action versions
+  # follow that maintainer's proven template; the host-side verify job keeps
+  # the repo-wide checkout@v6 convention.
   build-hap:
-    name: build-hap (debug, unsigned)
+    name: build-hap (debug)
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    container:
+      image: ghcr.io/dalongzhuazi/harmonyos-ci:api26
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           persist-credentials: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-
-      # The toolchain zip is ~2 GB; the cache keeps rebuilds fast.
-      - name: Cache command-line-tools
-        id: cache-tools
-        uses: actions/cache@v5
-        with:
-          path: command-line-tools
-          key: ${{ runner.os }}-harmony-clt-${{ env.CLT_VERSION }}
-
-      - name: Download command-line-tools
-        if: steps.cache-tools.outputs.cache-hit != 'true'
-        run: |
-          set -euo pipefail
-          curl -fSL --retry 3 -o /tmp/clt.zip "$CLT_URL"
-          sha256sum /tmp/clt.zip | tee clt.sha256
-          unzip -q /tmp/clt.zip -d .
-          rm /tmp/clt.zip
-          test -x command-line-tools/bin/hvigorw
-
-      - name: Record toolchain checksum
-        if: steps.cache-tools.outputs.cache-hit == 'true'
-        run: echo "toolchain restored from cache ($CLT_VERSION)" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Setup build environment
-        run: |
-          set -euo pipefail
-          TOOLS_DIR="$(pwd)/command-line-tools"
-          # local.properties is generated, never committed (see mobile-harmony/.gitignore).
-          echo "hwsdk.dir=$TOOLS_DIR/sdk" > mobile-harmony/local.properties
-          echo "$TOOLS_DIR/bin" >> "$GITHUB_PATH"
-          {
-            echo "OHPM_HOME=$TOOLS_DIR/ohpm"
-            echo "HOS_SDK_HOME=$TOOLS_DIR/sdk"
-            echo "DEVECO_SDK_HOME=$TOOLS_DIR/sdk"
-          } >> "$GITHUB_ENV"
-          chmod -R +x "$TOOLS_DIR/bin"
-
-      - name: Install dependencies
-        run: ohpm install --all
-        working-directory: mobile-harmony
 
       # Debug signing materials, base64-encoded, from AppGallery Connect.
       # Nothing is written unless every secret exists — a partially configured
@@ -164,12 +124,12 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          import os
           p = Path("mobile-harmony/build-profile.json5")
           text = p.read_text(encoding="utf-8")
           empty = '"signingConfigs": [],'
           if empty not in text:
               raise SystemExit("build-profile.json5: expected an empty signingConfigs array")
-          import os
           store_pw = os.environ["store_pw"]
           key_alias = os.environ["key_alias"]
           key_pw = os.environ["key_pw"]
@@ -194,18 +154,22 @@ jobs:
           key_alias: ${{ secrets.HARMONY_SIGNING_KEY_ALIAS != '' && secrets.HARMONY_SIGNING_KEY_ALIAS || 'debugKey' }}
           key_pw: ${{ secrets.HARMONY_SIGNING_KEY_PASSWORD != '' && secrets.HARMONY_SIGNING_KEY_PASSWORD || secrets.HARMONY_SIGNING_P12_PASSWORD }}
 
+      - name: Install dependencies
+        run: ohpm install --all
+        working-directory: mobile-harmony
+
       # signingConfigs is empty in the checked-in build-profile, so the HAP is
       # unsigned. Device installs need a signed package — see the summary step.
       - name: Build HAP (debug)
         run: |
           set -euo pipefail
-          hvigorw assembleHap --mode module -p product=default -p buildMode=debug --no-daemon
+          hvigorw assembleHap --mode module -p product=default -p buildMode=debug --no-daemon --stacktrace
         working-directory: mobile-harmony
 
-      - name: Upload unsigned HAP
-        uses: actions/upload-artifact@v7
+      - name: Upload HAP
+        uses: actions/upload-artifact@v4
         with:
-          name: orca-harmony-debug-unsigned
+          name: orca-harmony-debug
           path: mobile-harmony/entry/build/**/outputs/**/*.hap
           if-no-files-found: error
           retention-days: 14
@@ -215,7 +179,8 @@ jobs:
           cat >> "$GITHUB_STEP_SUMMARY" <<'NOTES'
           ## HarmonyOS debug build
 
-          Toolchain: commandline-tools-linux-x64, version ${{ env.CLT_VERSION }}.
+          Toolchain: ghcr.io/dalongzhuazi/harmonyos-ci:api26 (command-line-tools
+          26.0.0.461 + HarmonyOS API 26 SDK).
 
           Verification gate: the `verify` job must be green for this artifact to
           exist (interop + e2e + view-model + static checks — see

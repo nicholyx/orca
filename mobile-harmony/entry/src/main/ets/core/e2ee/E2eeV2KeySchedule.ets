@@ -26,12 +26,14 @@ export interface E2eeV2KeySchedule {
   transcriptHash: Uint8Array;
 }
 
-export function deriveE2eeV2KeySchedule(args: {
+export interface E2eeV2KeyScheduleArgs {
   sharedSecret: Uint8Array;
   transcript: Uint8Array;
   clientNonce: Uint8Array;
   desktopNonce: Uint8Array;
-}): E2eeV2KeySchedule {
+}
+
+export function deriveE2eeV2KeySchedule(args: E2eeV2KeyScheduleArgs): E2eeV2KeySchedule {
   requireLength(args.sharedSecret, KEY_BYTES, 'shared secret');
   requireLength(args.clientNonce, KEY_BYTES, 'client nonce');
   requireLength(args.desktopNonce, KEY_BYTES, 'desktop nonce');

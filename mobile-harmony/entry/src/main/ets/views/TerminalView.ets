@@ -22,7 +22,15 @@ const DEFAULT_ROWS = 24;
 
 @Component
 export struct TerminalView {
-  connection: OrcaConnection;
+  connection: OrcaConnection | null = null;
+
+  /** Fail-closed access: the view is inert until the page injects a connection. */
+  private conn(): OrcaConnection {
+    if (this.connection === null) {
+      throw new Error('TerminalView used before its connection was injected');
+    }
+    return this.connection;
+  }
 
   @State revision: number = 0;
   @State lines: TerminalLine[] = [];
@@ -39,7 +47,7 @@ export struct TerminalView {
 
   aboutToAppear(): void {
     this.refresh();
-    this.unsubscribe = this.connection.onChange(() => {
+    this.unsubscribe = this.conn().onChange(() => {
       this.refresh();
     });
     this.openInitialTerminal();
@@ -50,13 +58,13 @@ export struct TerminalView {
       this.unsubscribe();
       this.unsubscribe = null;
     }
-    this.connection.closeTerminal();
+    this.conn().closeTerminal();
   }
 
   private refresh(): void {
     const previous = this.lines.length;
-    this.lines = this.connection.terminal();
-    const snapshot = this.connection.snapshot();
+    this.lines = this.conn().terminal();
+    const snapshot = this.conn().snapshot();
     this.title = snapshot.hostName;
     this.stateLabel = connectionLabel(snapshot.state);
     this.stateTone = connectionTone(snapshot.state);
@@ -73,11 +81,11 @@ export struct TerminalView {
     if (this.opened) {
       return;
     }
-    if (!this.connection.isConnected()) {
+    if (!this.conn().isConnected()) {
       this.notice = 'Not connected yet. Waiting for the host…';
       return;
     }
-    this.connection
+    this.conn()
       .listTerminals()
       .then((terminals: TerminalDescriptor[]) => {
         this.terminals = terminals;
@@ -87,7 +95,7 @@ export struct TerminalView {
         }
         this.opened = true;
         this.notice = '';
-        this.connection.openTerminal(terminals[0].id, DEFAULT_COLS, DEFAULT_ROWS);
+        this.conn().openTerminal(terminals[0].id, DEFAULT_COLS, DEFAULT_ROWS);
       })
       .catch((error: Object) => {
         this.notice = `Could not list terminals: ${String(error)}`;
@@ -100,7 +108,7 @@ export struct TerminalView {
       return;
     }
     this.draft = '';
-    this.connection.sendTerminalInput(`${text}\n`).catch((error: Object) => {
+    this.conn().sendTerminalInput(`${text}\n`).catch((error: Object) => {
       this.notice = `Send failed: ${String(error)}`;
     });
   }
@@ -202,22 +210,28 @@ export struct TerminalView {
     }
     // A submenu of titles: picking one re-opens the feed on that terminal, which
     // is the only way to switch, because a terminal stream cannot be retargeted.
+    // showActionMenu caps the button list at six slots, so a longer terminal
+    // list is truncated to the first six.
+    const shown = names.length > 6 ? names.slice(0, 6) : names;
+    const buttons: promptAction.Button[] = shown.map((name: string): promptAction.Button => {
+      const button: promptAction.Button = {
+        text: name,
+        color: OrcaColors.foreground
+      };
+      return button;
+    });
     promptAction.showActionMenu({
       title: 'Attach to terminal',
-      buttons: names.map((name: string) => {
-        const button: promptAction.ActionMenuButton = {
-          text: name,
-          color: OrcaColors.foreground
-        };
-        return button;
-      })
+      buttons: [
+        buttons[0], buttons[1], buttons[2], buttons[3], buttons[4], buttons[5]
+      ]
     }).then((result: promptAction.ActionMenuSuccessResponse) => {
       const index = result.index;
       if (index < 0 || index >= this.terminals.length) {
         return;
       }
       this.opened = true;
-      this.connection.openTerminal(this.terminals[index].id, DEFAULT_COLS, DEFAULT_ROWS);
+      this.conn().openTerminal(this.terminals[index].id, DEFAULT_COLS, DEFAULT_ROWS);
     }).catch(() => {});
   }
 }

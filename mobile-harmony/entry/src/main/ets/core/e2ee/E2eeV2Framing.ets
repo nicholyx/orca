@@ -35,14 +35,20 @@ export interface E2eeV2FrameArgs {
   counter: number;
 }
 
-export function sealE2eeV2Frame(args: {
+export interface E2eeV2FrameSealArgs extends E2eeV2FrameArgs {
   payload: Uint8Array;
+}
+
+export interface E2eeV2FrameOpenArgs {
+  frame: Uint8Array;
   key: Uint8Array;
   sessionId: Uint8Array;
   direction: string;
   payloadKind: string;
-  counter: number;
-}): Uint8Array {
+  expectedCounter: number;
+}
+
+export function sealE2eeV2Frame(args: E2eeV2FrameSealArgs): Uint8Array {
   validateFrameArgs(args.key, args.sessionId, args.counter);
   const header = encodeHeader(args);
   const nonce = encodeNonce(args);
@@ -51,14 +57,7 @@ export function sealE2eeV2Frame(args: {
   return concatBytes([nonce, ciphertext]);
 }
 
-export function openE2eeV2Frame(args: {
-  frame: Uint8Array;
-  key: Uint8Array;
-  sessionId: Uint8Array;
-  direction: string;
-  payloadKind: string;
-  expectedCounter: number;
-}): Uint8Array | null {
+export function openE2eeV2Frame(args: E2eeV2FrameOpenArgs): Uint8Array | null {
   validateFrameArgs(args.key, args.sessionId, args.expectedCounter);
   if (args.frame.length < MIN_FRAME_LENGTH) {
     return null;

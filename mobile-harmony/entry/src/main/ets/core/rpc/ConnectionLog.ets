@@ -23,9 +23,7 @@ export interface ConnectionLogEntry {
   code: string;
 }
 
-export interface ConnectionLogSink {
-  (entry: ConnectionLogEntry): void;
-}
+export type ConnectionLogSink = (entry: ConnectionLogEntry) => void;
 
 /** Strips everything but the host, since a pairing URL may carry a token. */
 export function redactSocketEndpoint(endpoint: string): string {

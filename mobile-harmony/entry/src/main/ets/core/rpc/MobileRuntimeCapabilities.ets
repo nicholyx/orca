@@ -39,11 +39,13 @@ export function mobileRuntimeClientCapabilityUpdateParams(): Record<string, Obje
   return params;
 }
 
-/** Builds the advisory request sent once the channel authenticates. */
-export function mobileRuntimeClientCapabilityUpdateRequest(args: {
+export interface MobileRuntimeCapabilityUpdateArgs {
   id: string;
   deviceToken: string;
-}): Record<string, Object> {
+}
+
+/** Builds the advisory request sent once the channel authenticates. */
+export function mobileRuntimeClientCapabilityUpdateRequest(args: MobileRuntimeCapabilityUpdateArgs): Record<string, Object> {
   const request: Record<string, Object> = {};
   request.id = args.id;
   request.deviceToken = args.deviceToken;

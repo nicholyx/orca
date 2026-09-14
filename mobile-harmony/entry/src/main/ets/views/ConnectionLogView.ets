@@ -13,7 +13,15 @@ import { MONO_FAMILY, OrcaColors, OrcaRadius, OrcaSpace, OrcaType } from '../the
 
 @Component
 export struct ConnectionLogView {
-  connection: OrcaConnection;
+  connection: OrcaConnection | null = null;
+
+  /** Fail-closed access: the view is inert until the page injects a connection. */
+  private conn(): OrcaConnection {
+    if (this.connection === null) {
+      throw new Error('ConnectionLogView used before its connection was injected');
+    }
+    return this.connection;
+  }
 
   @State revision: number = 0;
   @State rows: LogRow[] = [];
@@ -21,9 +29,9 @@ export struct ConnectionLogView {
   private unsubscribe: (() => void) | null = null;
 
   aboutToAppear(): void {
-    this.rows = this.connection.log();
-    this.unsubscribe = this.connection.onChange(() => {
-      this.rows = this.connection.log();
+    this.rows = this.conn().log();
+    this.unsubscribe = this.conn().onChange(() => {
+      this.rows = this.conn().log();
       this.revision++;
     });
   }

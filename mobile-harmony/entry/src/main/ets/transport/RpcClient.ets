@@ -327,7 +327,7 @@ export class RpcClient {
     if (response.id.indexOf(LIVENESS_REQUEST_ID_PREFIX) === 0) {
       return;
     }
-    if (!response.ok && response.error.code === 'unauthorized') {
+    if (!response.ok && response.error?.code === 'unauthorized') {
       this.handleAuthRejected('Unauthorized — pairing may be revoked');
       return;
     }

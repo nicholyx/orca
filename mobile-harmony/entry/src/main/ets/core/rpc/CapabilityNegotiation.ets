@@ -39,7 +39,8 @@ export async function settleMobileRuntimeCapabilities(
     );
   } catch (error) {
     if (!isRpcDeliveryUnknown(error)) {
-      throw error;
+      // ArkTS only throws Error instances; keep real Errors as-is.
+      throw error instanceof Error ? error : new Error(`capability advisory failed: ${JSON.stringify(error)}`);
     }
     emitLog(
       'warn',
@@ -53,7 +54,7 @@ export async function settleMobileRuntimeCapabilities(
     emitLog(
       'warn',
       'Capability negotiation unavailable',
-      `Host refused the advisory: ${response.error.code}`,
+      `Host refused the advisory: ${response.error?.code}`,
       'capability-unavailable'
     );
   }

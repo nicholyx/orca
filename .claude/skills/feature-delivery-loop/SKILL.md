@@ -84,9 +84,12 @@ description: Orca 的功能交付闭环——开发、全量回归（含端到�
 
 - **fork 默认不注册 workflows**：新 workflow 只有 push 进默认分支后才会出现并运行；
   分支上永远不触发。合并 CI PR 本身的 push 事件即首次实测。
-- **华为工具链有下载墙**（需开发者登录）：CI 用版本钉死的社区镜像
-  （`CLT_URL`，当前 `commandline-tools-linux-x64-6.1.0.816`），SHA-256 记录进运行摘要；
-  官方开放无登录直链时切换。
+- **鸿蒙工具链有下载墙**（需开发者登录）：build-hap 跑在公开容器镜像
+  `ghcr.io/dalongzhuazi/harmonyos-ci:api26`（command-line-tools 26.0.0.461 +
+  HarmonyOS API 26 SDK，与工程 `modelVersion 26.0.0` 配套）。zip 类镜像
+  （如 6.1.0.816）的 hvigor 只支持到 modelVersion 6.1.0，编不了 26 的工程。
+  容器默认 shell 是 `sh`，job 必须设 `defaults: run: shell: bash`，否则
+  `set -o pipefail` 第一步就死。
 - **测试全绿才出包**（CI `needs` 链强制）；**全自动产物不进 release**；
   **release 必须人工确认后才打**。
 - 端到端对端用生产代码；oracle 依赖装隔离 prefix，不碰仓库 `node_modules`。

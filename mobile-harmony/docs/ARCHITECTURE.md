@@ -135,3 +135,13 @@ rooted shell, and a device token is a bearer credential for the entire runtime
 RPC surface. A host whose token cannot be read is hidden from the list rather
 than offered in a state that can never authenticate, and a stored list that
 cannot be parsed fails mutations closed instead of being overwritten.
+
+## Cleartext LAN pairing (opt-in profile)
+
+Direct pairing talks plain `ws://<ip>:6768` on the LAN. `base/profile/network_config.json`
+ships a `network-security-config` with `cleartext-traffic-permitted: true` for hosts
+that enforce a cleartext policy; it is **intentionally not referenced** from
+`module.json5`, so the module config stays valid on every SDK revision. To opt in,
+add `"resource": "$profile:network_config"` metadata to the ability that dials.
+Note the file must remain strict JSON: restool rejects comments and trailing
+commas in `$profile` resources even though neighbouring `.json5` files allow them.

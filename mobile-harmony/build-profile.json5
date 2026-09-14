@@ -1,0 +1,49 @@
+{
+  // Application-level build configuration. Targets HarmonyOS NEXT (API 26 / HarmonyOS 7),
+  // which is the current Release line as of 2026-08-29.
+  //
+  // Lowering the SDK floor: set compatibleSdkVersion (and targetSdkVersion) to an older
+  // Release string to widen device coverage, e.g. "6.1.1(24)" for HarmonyOS 6.1.1.
+  // Keep compileSdkVersion >= targetSdkVersion >= compatibleSdkVersion.
+  "app": {
+    "signingConfigs": [],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "compileSdkVersion": "26.0.0",
+        "compatibleSdkVersion": "26.0.0",
+        "targetSdkVersion": "26.0.0",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}

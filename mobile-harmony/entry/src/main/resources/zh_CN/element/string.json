@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Orca Mobile 入口模块"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Orca"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Orca"
+    },
+    {
+      "name": "camera_permission_reason",
+      "value": "用于扫描桌面端 Orca 显示的配对二维码。"
+    }
+  ]
+}

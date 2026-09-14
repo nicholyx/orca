@@ -1,0 +1,7 @@
+# Keep the ArkTS/JS names stable across release builds. Re-enable the property
+# rules only after `runtime detection` has been validated against the E2EE and
+# JSON wire paths, which depend on exact key names.
+-enable-property-obfuscation
+-enable-toplevel-obfuscation
+-enable-filename-obfuscation
+-enable-export-obfuscation

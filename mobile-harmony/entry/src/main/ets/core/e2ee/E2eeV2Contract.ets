@@ -420,10 +420,12 @@ function parseContext(value: Object | null | undefined): E2eeV2DecodedContext | 
     return null;
   }
   const record: Record<string, Object> = value as Record<string, Object>;
-  const transport = record.transport;
-  if (transport === null || transport === undefined) {
+  const transportValue = record.transport;
+  if (transportValue === null || transportValue === undefined) {
     return null;
   }
+  // Literal narrowing does not survive ArkTS's Record typing.
+  const transport = String(transportValue);
   if (transport !== 'direct' && transport !== 'relay') {
     return null;
   }

@@ -76,9 +76,9 @@ jobs:
           ./run-interop.sh | tee /tmp/interop.log
           {
             echo '## Mobile Harmony verification'
-            '```'
+            echo '```'
             grep -E '^(PASS|FAIL|ALL SUITES|SUITES FAILED)' /tmp/interop.log
-            '```'
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
         working-directory: mobile-harmony/tools/interop
 

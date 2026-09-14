@@ -211,6 +211,26 @@ for (const file of configFiles) {
 }
 
 // ---------------------------------------------------------------------------
+// 3b. $profile JSON files must be strict JSON — restool rejects comments and
+//     trailing commas even though neighbouring .json5 files allow them. CI
+//     caught this the hard way: a commented network_config.json failed the
+//     real build at CompileResource.
+// ---------------------------------------------------------------------------
+
+const profileDir = join(moduleRoot, 'resources/base/profile')
+if (existsSync(profileDir)) {
+  for (const name of readdirSync(profileDir)) {
+    if (!name.endsWith('.json')) continue
+    try {
+      JSON.parse(readFileSync(join(profileDir, name), 'utf8'))
+      ok(`profile ${name} is strict JSON`)
+    } catch (error) {
+      fail(`$profile resource is not strict JSON`, `${name} — ${error.message}`)
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 4. UI references imported from views/ actually exist
 // ---------------------------------------------------------------------------
 

@@ -93,6 +93,10 @@ jobs:
     timeout-minutes: 45
     container:
       image: ghcr.io/dalongzhuazi/harmonyos-ci:api26
+    # Why: the image's default shell is sh, which rejects `set -o pipefail`.
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@v4

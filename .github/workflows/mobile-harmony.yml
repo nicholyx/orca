@@ -1,0 +1,242 @@
+name: Mobile Harmony Checks
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - 'mobile-harmony/**'
+      # Why: this job holds the only checks that run the harmony interop
+      # pipeline, so edits to it must re-run the suite it guards.
+      - '.github/workflows/mobile-harmony.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile-harmony/**'
+      - '.github/workflows/mobile-harmony.yml'
+  # Why: the unsigned HAP artifact is what a maintainer installs on a device
+  # for the manual pass; workflow_dispatch lets one be produced on demand
+  # without touching mobile-harmony/.
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-harmony-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Turned on by four secrets — see build-hap "Materialize signing material".
+  # Until then the HAP is unsigned and the summary explains the one-time setup.
+  SIGNING_READY: ${{ secrets.HARMONY_SIGNING_P12 != '' && secrets.HARMONY_SIGNING_CER != '' && secrets.HARMONY_SIGNING_P7B != '' && secrets.HARMONY_SIGNING_P12_PASSWORD != '' }}
+  # Why: pinned toolchain mirror — Huawei's own download wall needs a dev
+  # login, which a runner cannot do. The zip is version-pinned in the URL and
+  # its SHA-256 is recorded in the run summary for audit. Swap to the official
+  # distribution if it ever gains an unauthenticated direct link.
+  CLT_URL: https://github.com/Okysu/harmony-auto-build/releases/download/commandline-tools-linux-x64-6.1.0.816/commandline-tools-linux-x64-6.1.0.816.zip
+  CLT_VERSION: 6.1.0.816
+
+jobs:
+  # The full host-side verification pipeline: three unit-vs-reference harnesses,
+  # the end-to-end suite against the shipped desktop code, the view-model suite,
+  # and the ArkTS/ArkUI static checks (see mobile-harmony/docs/VERIFICATION.md).
+  verify:
+    name: verify (interop + e2e + static)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      # The oracle packages stay out of the repo's node_modules by design
+      # (see tools/interop/run-interop.sh); CI mirrors the local setup by
+      # installing them into an isolated prefix.
+      - name: Install oracle dependencies
+        run: |
+          set -euo pipefail
+          npm install --prefix "$HOME/harmony-oracle" \
+            tweetnacl @noble/hashes@1.8.0 zod@4.5.4 esbuild
+
+      - name: Run the interop verification pipeline
+        run: |
+          set -euo pipefail
+          export ORACLE_NODE_MODULES="$HOME/harmony-oracle/node_modules"
+          ./run-interop.sh | tee /tmp/interop.log
+          {
+            echo '## Mobile Harmony verification'
+            '```'
+            grep -E '^(PASS|FAIL|ALL SUITES|SUITES FAILED)' /tmp/interop.log
+            '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        working-directory: mobile-harmony/tools/interop
+
+  # Test gate first: a red verify job means no package is produced.
+  build-hap:
+    name: build-hap (debug, unsigned)
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      # The toolchain zip is ~2 GB; the cache keeps rebuilds fast.
+      - name: Cache command-line-tools
+        id: cache-tools
+        uses: actions/cache@v5
+        with:
+          path: command-line-tools
+          key: ${{ runner.os }}-harmony-clt-${{ env.CLT_VERSION }}
+
+      - name: Download command-line-tools
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          curl -fSL --retry 3 -o /tmp/clt.zip "$CLT_URL"
+          sha256sum /tmp/clt.zip | tee clt.sha256
+          unzip -q /tmp/clt.zip -d .
+          rm /tmp/clt.zip
+          test -x command-line-tools/bin/hvigorw
+
+      - name: Record toolchain checksum
+        if: steps.cache-tools.outputs.cache-hit == 'true'
+        run: echo "toolchain restored from cache ($CLT_VERSION)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup build environment
+        run: |
+          set -euo pipefail
+          TOOLS_DIR="$(pwd)/command-line-tools"
+          # local.properties is generated, never committed (see mobile-harmony/.gitignore).
+          echo "hwsdk.dir=$TOOLS_DIR/sdk" > mobile-harmony/local.properties
+          echo "$TOOLS_DIR/bin" >> "$GITHUB_PATH"
+          {
+            echo "OHPM_HOME=$TOOLS_DIR/ohpm"
+            echo "HOS_SDK_HOME=$TOOLS_DIR/sdk"
+            echo "DEVECO_SDK_HOME=$TOOLS_DIR/sdk"
+          } >> "$GITHUB_ENV"
+          chmod -R +x "$TOOLS_DIR/bin"
+
+      - name: Install dependencies
+        run: ohpm install --all
+        working-directory: mobile-harmony
+
+      # Debug signing materials, base64-encoded, from AppGallery Connect.
+      # Nothing is written unless every secret exists — a partially configured
+      # repo falls back to the unsigned build instead of a half-signed one.
+      - name: Materialize signing material
+        if: env.SIGNING_READY == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p mobile-harmony/.signing
+          printf '%s' "$HARMONY_SIGNING_P12" | base64 -d > mobile-harmony/.signing/debug.p12
+          printf '%s' "$HARMONY_SIGNING_CER" | base64 -d > mobile-harmony/.signing/debug.cer
+          printf '%s' "$HARMONY_SIGNING_P7B" | base64 -d > mobile-harmony/.signing/debug.p7b
+        env:
+          HARMONY_SIGNING_P12: ${{ secrets.HARMONY_SIGNING_P12 }}
+          HARMONY_SIGNING_CER: ${{ secrets.HARMONY_SIGNING_CER }}
+          HARMONY_SIGNING_P7B: ${{ secrets.HARMONY_SIGNING_P7B }}
+
+      # build-profile.json5 is JSON5 with comments, so this is a pinned
+      # single-line replacement of its empty signingConfigs array, not a
+      # re-serialization of the file.
+      - name: Inject signing config
+        if: env.SIGNING_READY == 'true'
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("mobile-harmony/build-profile.json5")
+          text = p.read_text(encoding="utf-8")
+          empty = '"signingConfigs": [],'
+          if empty not in text:
+              raise SystemExit("build-profile.json5: expected an empty signingConfigs array")
+          import os
+          store_pw = os.environ["store_pw"]
+          key_alias = os.environ["key_alias"]
+          key_pw = os.environ["key_pw"]
+          lines = [
+              '"signingConfigs": [{',
+              '"name": "default",',
+              '"type": "HarmonyOS",',
+              '"material": {',
+              '"certpath": ".signing/debug.cer",',
+              '"storePassword": ' + '"' + store_pw + '",',
+              '"keyAlias": ' + '"' + key_alias + '",',
+              '"keyPassword": ' + '"' + key_pw + '",',
+              '"profile": ".signing/debug.p7b",',
+              '"signAlg": "SHA256withECDSA",',
+              '"storeFile": ".signing/debug.p12"',
+              '}}],',
+          ]
+          p.write_text(text.replace(empty, "".join(lines), 1), encoding="utf-8")
+          PY
+        env:
+          store_pw: ${{ secrets.HARMONY_SIGNING_P12_PASSWORD }}
+          key_alias: ${{ secrets.HARMONY_SIGNING_KEY_ALIAS != '' && secrets.HARMONY_SIGNING_KEY_ALIAS || 'debugKey' }}
+          key_pw: ${{ secrets.HARMONY_SIGNING_KEY_PASSWORD != '' && secrets.HARMONY_SIGNING_KEY_PASSWORD || secrets.HARMONY_SIGNING_P12_PASSWORD }}
+
+      # signingConfigs is empty in the checked-in build-profile, so the HAP is
+      # unsigned. Device installs need a signed package — see the summary step.
+      - name: Build HAP (debug)
+        run: |
+          set -euo pipefail
+          hvigorw assembleHap --mode module -p product=default -p buildMode=debug --no-daemon
+        working-directory: mobile-harmony
+
+      - name: Upload unsigned HAP
+        uses: actions/upload-artifact@v7
+        with:
+          name: orca-harmony-debug-unsigned
+          path: mobile-harmony/entry/build/**/outputs/**/*.hap
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write install notes
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'NOTES'
+          ## HarmonyOS debug build
+
+          Toolchain: commandline-tools-linux-x64, version ${{ env.CLT_VERSION }}.
+
+          Verification gate: the `verify` job must be green for this artifact to
+          exist (interop + e2e + view-model + static checks — see
+          `mobile-harmony/docs/VERIFICATION.md`).
+
+          ## Installing on a device
+
+          ${{ env.SIGNING_READY == 'true' && 'The HAP is signed with the configured debug certificate and ready to install.' || 'The HAP is **unsigned** — HarmonyOS NEXT refuses to install an unsigned package. One-time setup to make it installable:' }}
+
+          The unsigned path's one-time setup:
+
+          1. In AppGallery Connect, create a project + app (package name
+             `com.stably.orca.mobile.harmony`), then request a **debug
+             certificate** (`.cer`) and a **debug provision profile** (`.p7b`).
+          2. Generate a keystore (`.p12`) with the DevEco keytool pair and note
+             its password.
+          3. Store GitHub secrets: `HARMONY_SIGNING_P12`, `HARMONY_SIGNING_CER`,
+             `HARMONY_SIGNING_P7B` (base64) and `HARMONY_SIGNING_P12_PASSWORD`;
+             optionally `HARMONY_SIGNING_KEY_ALIAS` (default `debugKey`) and
+             `HARMONY_SIGNING_KEY_PASSWORD` (default = the store password).
+          4. Re-run this workflow — the signing steps activate when the secrets
+             exist, and the artifact becomes directly installable.
+          NOTES
+        working-directory: mobile-harmony

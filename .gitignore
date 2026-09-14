@@ -150,8 +150,10 @@ validation-screenshots/
 test-results/
 playwright-report/
 
-# Agent skill installations (machine-local, populated by agent tooling)
-/.claude/skills/
+# Agent skill installations (machine-local, populated by agent tooling);
+# project-maintained skills are re-included below.
+/.claude/skills/*
+!/.claude/skills/feature-delivery-loop
 /.agents/skills/
 /skills-lock.json
 

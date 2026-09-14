@@ -1,0 +1,9 @@
+{
+  "name": "entry",
+  "version": "0.0.48",
+  "description": "Orca Mobile HarmonyOS entry module.",
+  "main": "",
+  "author": "Orca",
+  "license": "MIT",
+  "dependencies": {}
+}

@@ -1,0 +1,14 @@
+{
+  // Project-level package description. modelVersion must match the DevEco Studio / hvigor
+  // toolchain in use; DevEco Studio 5.0.5+ bundles hvigor, so no explicit hvigor dependency
+  // is needed (see hvigor/hvigor-config.json5).
+  "modelVersion": "26.0.0",
+  "name": "orca-mobile-harmony",
+  "version": "0.0.48",
+  "description": "Orca Mobile for HarmonyOS — companion app for the Orca desktop runtime.",
+  "main": "",
+  "author": "Orca",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}

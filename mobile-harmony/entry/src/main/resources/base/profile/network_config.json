@@ -1,0 +1,11 @@
+{
+  // Optional network security policy. The LAN pairing path uses plain `ws://<ip>:6768`,
+  // so hosts that enforce a cleartext policy need this profile referenced from
+  // module.json5 (see docs/BUILD.md — "Cleartext LAN pairing"). It is intentionally
+  // NOT referenced by default so the module config stays valid on every SDK revision.
+  "network-security-config": {
+    "base-config": {
+      "cleartext-traffic-permitted": true
+    }
+  }
+}

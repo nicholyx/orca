@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Orca Mobile entry module"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Orca"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Orca"
+    },
+    {
+      "name": "camera_permission_reason",
+      "value": "Used to scan the pairing QR code shown by Orca on your desktop."
+    }
+  ]
+}

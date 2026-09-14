@@ -1,0 +1,21 @@
+{
+  // Keep modelVersion in step with the root oh-package.json5 and the installed toolchain.
+  "modelVersion": "26.0.0",
+  "dependencies": {},
+  "execution": {
+    "analyze": "normal",
+    "daemon": true,
+    "incremental": true,
+    "parallel": true,
+    "typeCheck": false
+  },
+  "logging": {
+    "level": "info"
+  },
+  "debugging": {
+    "stacktrace": false
+  },
+  "nodeOptions": {
+    "maxOldSpaceSize": 8192
+  }
+}

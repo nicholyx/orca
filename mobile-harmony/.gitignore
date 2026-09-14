@@ -1,0 +1,21 @@
+# Build output
+/build/
+/.hvigor/
+/.idea/
+/entry/build/
+/entry/.preview/
+/oh_modules/
+/entry/oh_modules/
+*.har
+*.hap
+*.hsp
+
+# Interop harness output (see tools/interop/run-interop.sh)
+/tools/interop/.build/
+
+# Local signing material — never commit
+/signature/
+*.p12
+*.cer
+*.p7b
+*.csr

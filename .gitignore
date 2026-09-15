@@ -151,9 +151,12 @@ test-results/
 playwright-report/
 
 # Agent skill installations (machine-local, populated by agent tooling);
-# project-maintained skills are re-included below.
+# project-maintained and Trellis-managed skills are re-included below —
+# they ship with the repo so every clone gets the same workflow (the
+# Trellis pattern, as in the action-sync-images reference repo).
 /.claude/skills/*
 !/.claude/skills/feature-delivery-loop
+!/.claude/skills/trellis-*
 /.agents/skills/
 /skills-lock.json
 

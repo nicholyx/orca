@@ -5,6 +5,11 @@ description: Orca 的功能交付闭环——开发、全量回归（含端到�
 
 # 功能交付闭环（feature-delivery-loop）
 
+> 规范的单一事实来源已沉淀进 Trellis（任何平台/会话自动注入）：
+> `.trellis/spec/maintenance/github-workflow.md`（Issue/PR/commit 规范）与
+> `.trellis/spec/maintenance/delivery-gate.md`（交付门禁与 release 条件）。
+> 本 skill 保留触发条件与操作视角；两边如有出入，以 spec 为准。
+
 本仓库（fork `nicholyx/orca`，上游 `stablyai/orca`）按真实开源项目的方式交付功能：
 **Issue → 分批 PR → CI 全量回归 → CI 打包 artifact → 维护者人工测试 → 确认后 release**。
 参考实现：HarmonyOS 移动端（`mobile-harmony/`，Epic Issue #1，PR #2–#8）。

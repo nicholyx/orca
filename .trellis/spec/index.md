@@ -6,6 +6,7 @@ organized by package and layer.
 | Directory | Scope |
 | --- | --- |
 | [`mobile-harmony/`](./mobile-harmony/index.md) | The HarmonyOS companion app — **the only actively maintained code in this fork** |
+| [`maintenance/`](./maintenance/index.md) | How this fork is maintained on GitHub: issues, PRs, commits, the delivery gate, release conditions |
 | [`guides/`](./guides/index.md) | Cross-package thinking guides (code reuse, cross-layer data flow) |
 
 Upstream packages (`mobile/`, `src/`, Electron app infrastructure) are

@@ -42,7 +42,9 @@ Before writing code under `mobile-harmony/`:
       [wire-parity.md](./wire-parity.md) — the reference module is the oracle.
 - [ ] If it touches a platform adapter or adds one, plan the `kit-stub` fake
       in the same change.
-- [ ] Branch + PR per the `feature-delivery-loop` skill; one concern per PR.
+- [ ] Branch + PR per [`../maintenance/github-workflow.md`](../maintenance/github-workflow.md)
+      (one concern per PR, Conventional Commits, `Part of #N`); delivery and
+      release conditions per [`../maintenance/delivery-gate.md`](../maintenance/delivery-gate.md).
 
 ## Quality Check
 

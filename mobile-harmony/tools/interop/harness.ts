@@ -11,7 +11,7 @@ const failedChecks: string[] = []
 
 export function check(name: string, condition: boolean, detail?: string): void {
   assertions++
-  if (condition) return
+  if (condition) {return}
   failures++
   failedChecks.push(name)
   console.error(`  FAIL  ${name}${detail ? ` — ${detail}` : ''}`)
@@ -22,8 +22,14 @@ export function section(title: string): void {
 }
 
 export function equalHex(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+  if (a.length !== b.length) {
+    return false
+  }
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) {
+      return false
+    }
+  }
   return true
 }
 
@@ -62,11 +68,11 @@ export function jsonEqual(a: unknown, b: unknown): boolean {
 }
 
 function sortDeep(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortDeep)
+  if (Array.isArray(value)) {return value.map(sortDeep)}
   if (value !== null && typeof value === 'object') {
     const source = value as Record<string, unknown>
     const out: Record<string, unknown> = {}
-    for (const key of Object.keys(source).sort()) out[key] = sortDeep(source[key])
+    for (const key of Object.keys(source).sort()) {out[key] = sortDeep(source[key])}
     return out
   }
   return value
@@ -78,8 +84,8 @@ export function finish(label: string): never {
     console.log(`PASS  ${assertions} assertions — ${label}`)
   } else {
     console.error(`FAIL  ${failures} of ${assertions} assertions failed:`)
-    for (const name of failedChecks.slice(0, 40)) console.error(`  · ${name}`)
-    if (failedChecks.length > 40) console.error(`  … and ${failedChecks.length - 40} more`)
+    for (const name of failedChecks.slice(0, 40)) {console.error(`  · ${name}`)}
+    if (failedChecks.length > 40) {console.error(`  … and ${failedChecks.length - 40} more`)}
   }
   process.exit(failures === 0 ? 0 : 1)
 }

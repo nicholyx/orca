@@ -46,7 +46,7 @@ export class FakePreferences {
   }
 }
 
-export interface FakeAssetEntry {
+export type FakeAssetEntry = {
   alias: string
   secret: Uint8Array
   accessibility: number
@@ -132,7 +132,7 @@ const ASSET_NOT_FOUND = 24000002
 // Installed kit doubles
 // ---------------------------------------------------------------------------
 
-export interface KitHooks {
+export type KitHooks = {
   /** Opens the client end of a fresh link; called once per dial. */
   openSocket: (endpoint: string) => SocketLike
   preferences?: FakePreferences
@@ -148,7 +148,7 @@ export interface KitHooks {
   scanResult?: string | null
 }
 
-export interface SocketLike {
+export type SocketLike = {
   onOpen: (handler: () => void) => void
   onMessage: (handler: (data: string | ArrayBuffer) => void) => void
   onClose: (handler: (code: number) => void) => void
@@ -226,19 +226,19 @@ class StubWebSocket {
     socket.onOpen(() => {
       this.connected = true
       const handler = this.handlers.open
-      if (handler !== undefined) handler(undefined, { status: 0, message: '' })
+      if (handler !== undefined) {handler(undefined, { status: 0, message: '' })}
     })
     socket.onMessage((data) => {
       const handler = this.handlers.message
-      if (handler !== undefined) handler(undefined, data)
+      if (handler !== undefined) {handler(undefined, data)}
     })
     socket.onClose((code) => {
       const handler = this.handlers.close
-      if (handler !== undefined) handler(undefined, { code, reason: '' })
+      if (handler !== undefined) {handler(undefined, { code, reason: '' })}
     })
     socket.onError((message) => {
       const handler = this.handlers.error
-      if (handler !== undefined) handler({ code: 0, message })
+      if (handler !== undefined) {handler({ code: 0, message })}
     })
     return Promise.resolve(true)
   }
@@ -265,7 +265,7 @@ export const webSocket = {
 // --- @kit.ArkData ----------------------------------------------------------
 
 export const preferences = {
-  getPreferences: (_context: unknown, options: { name: string }): Promise<FakePreferences> => {
+  getPreferences: (_context: unknown, _options: { name: string }): Promise<FakePreferences> => {
     return Promise.resolve(requireHooks().preferences ?? new FakePreferences())
   },
   Options: class Options {}

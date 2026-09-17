@@ -14,9 +14,8 @@
 import { mkdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 
-const here = dirname(fileURLToPath(import.meta.url))
+const here = import.meta.dirname
 const oracleModules = process.env.ORACLE_NODE_MODULES
 if (!oracleModules) {
   console.error(

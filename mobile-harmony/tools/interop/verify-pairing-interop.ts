@@ -10,6 +10,13 @@
  * Nothing here is part of the shipped app.
  */
 import { check, section, finish, jsonEqual } from './harness'
+import {
+  FIXED_NOW,
+  VALID_KEY_B64,
+  relayObject,
+  toBase64Url,
+  validOfferJson
+} from './pairing-fixtures'
 
 import {
   extractPairingCodeFromUrl,
@@ -27,38 +34,6 @@ import { getNextHostNameFromHosts as refNextHostName } from '../../../mobile/src
 import { StoredHostProfileSchema } from '../../../mobile/src/transport/types'
 import { createPairingOfferSchema } from '../../../src/shared/mobile-relay-pairing-offer'
 
-const FIXED_NOW = 1_800_000_000_000
-
-/** A canonical 32-byte Curve25519 key, standard base64 with padding. */
-const VALID_KEY_B64 = Buffer.from(Uint8Array.from({ length: 32 }, (_v, i) => i)).toString('base64')
-
-function toBase64Url(json: string): string {
-  return Buffer.from(json, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function validOfferJson(overrides: Record<string, unknown> = {}): string {
-  return JSON.stringify({
-    v: 2,
-    endpoint: 'ws://192.168.1.20:7788',
-    deviceToken: 'device-token-abc',
-    publicKeyB64: VALID_KEY_B64,
-    ...overrides
-  })
-}
-
-function relayObject(overrides: Record<string, unknown> = {}, now = Date.now()): Record<string, unknown> {
-  return {
-    v: 1,
-    directorUrl: 'https://relay.example.com',
-    cellUrl: 'https://cell.example.com',
-    assignmentEpoch: 7,
-    relayHostId: 'ABCDEFGHIJKLMNOP',
-    inviteToken: 'A'.repeat(43),
-    inviteExpiresAt: now + 60_000,
-    e2eeFraming: 2,
-    ...overrides
-  }
-}
 
 // ---------------------------------------------------------------------------
 // 22. Pairing URL extraction
@@ -185,8 +160,8 @@ section('24. pairing offer parser robustness')
   )
   check(
     'padded base64url is accepted',
-    parsePairingCode(toBase64Url(validOfferJson()) + '===', () => Date.now()) !== null ||
-      refParse(toBase64Url(validOfferJson()) + '===') === null
+    parsePairingCode(`${toBase64Url(validOfferJson())  }===`, () => Date.now()) !== null ||
+      refParse(`${toBase64Url(validOfferJson())  }===`) === null
   )
   check(
     'a huge payload is rejected without parsing',
@@ -325,15 +300,15 @@ section('28. stored host profile parsing')
    * the real schema. Returns null for an unreadable payload.
    */
   function referenceParse(raw: string): Record<string, unknown>[] | null {
-    if (!raw) return []
+    if (!raw) {return []}
     try {
       const parsed = JSON.parse(raw) as unknown
-      if (!Array.isArray(parsed)) return null
+      if (!Array.isArray(parsed)) {return null}
       const out: Record<string, unknown>[] = []
       for (const item of parsed) {
-        if (item && typeof item === 'object' && 'deviceToken' in item) continue
+        if (item && typeof item === 'object' && 'deviceToken' in item) {continue}
         const result = StoredHostProfileSchema.safeParse(item)
-        if (result.success) out.push(result.data as Record<string, unknown>)
+        if (result.success) {out.push(result.data as Record<string, unknown>)}
       }
       return out
     } catch {

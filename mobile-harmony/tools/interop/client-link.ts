@@ -14,14 +14,16 @@
  * exactly as it would on a device.
  */
 import { E2eeV2ClientSession } from '../../entry/src/main/ets/core/e2ee/E2eeV2ClientSession.ets'
-import { RandomBytes } from '../../entry/src/main/ets/core/crypto/RandomSource.ets'
-import {
+import type { RandomBytes } from '../../entry/src/main/ets/core/crypto/RandomSource.ets'
+import type {
   RpcSocketHandle,
-  RpcSocketPreflight,
+  RpcSocketPreflight} from '../../entry/src/main/ets/transport/RpcSocketSession.ets';
+import {
   RpcSocketSession
 } from '../../entry/src/main/ets/transport/RpcSocketSession.ets'
-import { RpcSocketSessionFactory } from '../../entry/src/main/ets/transport/RpcClient.ets'
-import { DesktopPeer, PipeSide, createPipe } from './desktop-peer'
+import type { RpcSocketSessionFactory } from '../../entry/src/main/ets/transport/RpcClient.ets'
+import type { DesktopPeer } from './desktop-peer';
+import { createPipe, type PipeSide } from './pipe-side'
 
 const STATE_CONNECTING = 0
 const STATE_OPEN = 1
@@ -43,16 +45,16 @@ export class PipeSocketHandle implements RpcSocketHandle {
   constructor(side: PipeSide) {
     this.side = side
     side.setMessageHandler((data) => {
-      if (this.state === STATE_OPEN) this.messageHandler(data)
+      if (this.state === STATE_OPEN) {this.messageHandler(data)}
     })
     side.setCloseHandler(() => {
-      if (this.state === STATE_CLOSED) return
+      if (this.state === STATE_CLOSED) {return}
       this.state = STATE_CLOSED
       this.closeHandler(-1)
     })
     // A real socket opens asynchronously, after the caller has attached handlers.
     queueMicrotask(() => {
-      if (this.state !== STATE_CONNECTING) return
+      if (this.state !== STATE_CONNECTING) {return}
       this.state = STATE_OPEN
       this.openHandler()
     })
@@ -67,7 +69,7 @@ export class PipeSocketHandle implements RpcSocketHandle {
   }
 
   send(frame: string | ArrayBuffer): void {
-    if (this.state !== STATE_OPEN) return
+    if (this.state !== STATE_OPEN) {return}
     const bytes = typeof frame === 'string' ? frame.length : frame.byteLength
     this.inFlight += bytes
     this.side.send(frame)
@@ -75,7 +77,7 @@ export class PipeSocketHandle implements RpcSocketHandle {
     // bytes that were accepted but not yet drained.
     queueMicrotask(() => {
       this.inFlight -= bytes
-      if (this.inFlight < 0) this.inFlight = 0
+      if (this.inFlight < 0) {this.inFlight = 0}
     })
   }
 
@@ -96,7 +98,7 @@ export class PipeSocketHandle implements RpcSocketHandle {
   }
 
   close(): void {
-    if (this.state === STATE_CLOSED) return
+    if (this.state === STATE_CLOSED) {return}
     this.state = STATE_CLOSING
     this.side.close()
   }
@@ -107,7 +109,7 @@ export class PipeSocketHandle implements RpcSocketHandle {
   }
 }
 
-export interface LinkOptions {
+export type LinkOptions = {
   desktopPublicKeyB64: string
   random: RandomBytes
   /** Called with each new desktop peer, so a test can inspect every dial. */
@@ -129,7 +131,7 @@ export class PipeSocketFactory implements RpcSocketSessionFactory {
   }
 
   latestPeer(): DesktopPeer | null {
-    return this.peers.length === 0 ? null : this.peers[this.peers.length - 1]
+    return this.peers.length === 0 ? null : this.peers.at(-1)
   }
 
   /** Every desktop peer, so a test can assert across a reconnect. */

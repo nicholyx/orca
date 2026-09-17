@@ -21,9 +21,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, relative, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 
-const here = dirname(fileURLToPath(import.meta.url))
+const here = import.meta.dirname
 const root = join(here, '..', '..')
 const sourceRoot = join(root, 'entry/src/main/ets')
 const oracleModules = process.env.ORACLE_NODE_MODULES
@@ -128,10 +127,10 @@ function checkBalanced(rel, source) {
     if (pairs[char]) {
       stack.push(char)
     } else if (closers[char]) {
-      if (stack.pop() !== closers[char]) return `${rel}: unbalanced "${char}"`
+      if (stack.pop() !== closers[char]) {return `${rel}: unbalanced "${char}"`}
     }
   }
-  if (stack.length !== 0) return `${rel}: ${stack.length} unclosed "${stack[stack.length - 1]}"`
+  if (stack.length !== 0) {return `${rel}: ${stack.length} unclosed "${stack.at(-1)}"`}
   return null
 }
 
@@ -145,7 +144,7 @@ function importSpecifiers(source) {
   const out = []
   const re = /(?:from\s+|import\s*)['"]([^'"]+)['"]/g
   let match
-  while ((match = re.exec(source)) !== null) out.push(match[1])
+  while ((match = re.exec(source)) !== null) {out.push(match[1])}
   return out
 }
 
@@ -211,7 +210,7 @@ for (const file of files) {
   const lines = stripComments(source).split('\n')
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]
-    if (line.trim().length === 0) continue
+    if (line.trim().length === 0) {continue}
     for (const rule of RULES) {
       if (rule.pattern.test(line)) {
         ruleFailures++

@@ -85,6 +85,28 @@ description: Orca 的功能交付闭环——开发、全量回归（含端到�
 4. 发布前用 `git ls-remote --tags origin <tag>` 确认 tag 不存在（防网络重试造成
    重复发布）。
 
+## 七、上游同步（周期性，参考 #20）
+
+fork 只维护鸿蒙端，但上游 `mobile/` 与 `src/` 的线协议是鸿蒙端镜像的对象。**漂移不会自己报错**——
+两边静默发散，直到真机上表现为「连上了但什么都不显示」。
+
+1. **先审计，再合并**。逐个核对鸿蒙端镜像的契约文件在上游新提交里的变化
+   （E2EE v2 调度/分帧/会话/握手、配对 offer、终端分帧、RPC envelope、背压、重连、
+   liveness、流取消形状、能力通告）。多数同步只有一两处真实差异。
+2. **用 merge commit，绝不 squash**。squash 会切断上游祖先关系，之后每次同步都要重处理
+   全部历史。`gh pr merge --merge`。验证：`git rev-list --count origin/main..upstream/main`
+   必须为 **0**。
+3. **合并与移植同一个 PR**。单独合并会留下 parity 断言失败的中断态，违反「每步 main 自洽」；
+   上游同步在客户端跟进之前不算完成。
+4. **让守卫断言驱动移植**：`verify-transport-interop` 的 parity 检查会精确报出差异
+   （漏了哪几项、顺序如何）。先跑测试再改代码。
+5. **移植前确认是否惰性**：新能力可能只是请求侧门禁（如 `agent.launch.v2` 只在
+   `supportsAgentLaunch()` 读）或未订阅的流路径。惰性也要精确对齐——清单是逐字节契约，
+   且能力宁可多广告（宿主看到缺失会降级，不是报错）。
+6. **区分「我们的失败」与「继承的失败」**：fork 上 `track-community-pr` 需要上游 App 私钥、
+   永远不可能通过；上游 main 自身也可能带着红的测试（比对文件是否与上游逐字节一致即可判定）。
+   只修属于我们自己的那类（如 `static analysis`），并在 PR 里给出证据。
+
 ## 硬规则（踩坑沉淀，任何时候优先）
 
 - **fork 默认不注册 workflows**：新 workflow 只有 push 进默认分支后才会出现并运行；
@@ -102,3 +124,31 @@ description: Orca 的功能交付闭环——开发、全量回归（含端到�
 - workflow 改完先过 `actionlint`；`run:` 多行脚本开头 `set -euo pipefail`；
   markdown 反引号别放在单引号 echo 里（SC2016），用 quoted heredoc 写摘要。
 - 中文内容写完后全仓扫 U+FFFD（见 action-sync-images maintain-loop 同名规则）。
+
+### lint 有两道门禁，本地都能复现（参考 #21）
+
+装一份隔离 oxlint 即可得到秒级反馈（`npm install --prefix /tmp/oxlint-tool oxlint@<版本>`）：
+
+1. **全仓 lint**：`oxlint` 用根 `.oxlintrc.json`。`max-lines` 对 `**/*.ts` 是 **300 行**
+   （跳过空行与注释），`*.mjs` 是 600，`*.test.*` 是 800。超限只能**抽内聚单元**——
+   AGENTS.md 同时禁止内联 `max-lines` 禁用与逐文件放宽。
+2. **改动行 casting 门禁**：`node config/scripts/check-changed-code-quality.mjs` 用独立配置
+   `config/oxlint-code-quality-casting.json`（`assertionStyle: never`），**只查改动行**。
+   根配置允许 `as`，所以全仓 lint 绿了这道门禁仍可能红。**注意：拆分/移动代码会让旧断言的
+   行变成「改动行」，从而被拦下**——这是好事，但要提前预期。
+
+处理 `as` 断言的优先顺序：
+- **能用仓库自己的收窄 helper 就消除它**：`mobile-harmony/entry/.../core/json/JsonValue.ets`
+  的 `parseJsonRecord` / `asRecord` / `asString` / `asNumber` / `asStringArray`；
+  仅需改类型时优先 `const x: T = value`（`JSON.parse` 返回 `any`，注解即可，无需断言）。
+- 确实不可避时加行级豁免，且**必须与断言同一行**：
+  `// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: <可验证的理由>`。
+  `-next-line` 只覆盖紧接着的一行——跨行调用要把断言收在一行内，
+  否则像 #21 那样 82/83 行的 `as never` 漏网。
+- 反例警告：给「不别名」这类**身份断言**套复制型 accessor（如 `asStringArray`）会让断言恒真，
+  这种地方必须保留引用并写明理由。
+
+拆分/移动代码时的两个高频自伤（都由套件在运行时抓到，check-syntax 不做类型检查）：
+抽出的函数**忘了 `export`**（lint 会报「已声明未使用」，运行时是 `(void 0) is not a function`）；
+用了 helper **忘了加 import**（`X is not defined`）。改完先跑
+`mobile-harmony/tools/interop/run-interop.sh`，再谈提交。

@@ -32,8 +32,10 @@ if (!oracleModules) {
   process.exit(2)
 }
 
+// Same explicit resolution as build.mjs: NODE_PATH is only set by
+// run-interop.sh, so this must not depend on it.
 const require = createRequire(import.meta.url)
-const esbuild = require('esbuild')
+const esbuild = require(require.resolve('esbuild', { paths: [oracleModules] }))
 
 function collectEts(dir) {
   const out = []

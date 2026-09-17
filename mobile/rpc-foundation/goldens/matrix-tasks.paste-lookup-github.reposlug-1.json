@@ -1,0 +1,1102 @@
+{
+  "operation": "tasks.paste-lookup",
+  "family": "tasks.paste-lookup",
+  "namedDeltas": [],
+  "runnerVersion": 1,
+  "baseline": "01a1b6b024f6664c110e9ae50717ef4880fd8d82",
+  "lockfileSha256": "4568633356187895ccda8e2ff83245c37d5621832c69e268733733b6947971e3",
+  "recorderSha256": "d4fa125899cd863c03dbf96657d46b8c7d6c0ccf522b342bc4f164ed1e3becfe",
+  "adapterSha256": "343b97826782820b7aecaddd13a4c8cdbbbca057c83021863d577a677934f3a3",
+  "scenarioSha256": "749f877ac0c08860f74fc56e34b07f51960dda5bd1fdcf9df847b5200bf67779",
+  "platform": "darwin",
+  "scenarioVersion": 1,
+  "projectionVersion": 2,
+  "goldenFormatVersion": 5,
+  "values": {
+    "01ebbe1cc2d6": {
+      "name": "github.repoSlug#1",
+      "ordinal": 7,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.repoSlug"
+        },
+        {
+          "name": "params",
+          "value": {
+            "repo": "id:repo-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "error": {
+            "code": "refused",
+            "message": ""
+          },
+          "id": "frame-4",
+          "ok": false
+        }
+      }
+    },
+    "0576563ad84a": {
+      "name": "github.repoSlug#1",
+      "ordinal": 7,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.repoSlug"
+        },
+        {
+          "name": "params",
+          "value": {
+            "repo": "id:repo-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "id": "frame-4",
+          "ok": true,
+          "result": {
+            "$rpc": "null"
+          }
+        }
+      }
+    },
+    "0875baed03d5": {
+      "name": "github.repoSlug#1",
+      "ordinal": 7,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.repoSlug"
+        },
+        {
+          "name": "params",
+          "value": {
+            "repo": "id:repo-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "id": "frame-4",
+          "ok": true,
+          "result": {
+            "error": "inner refused",
+            "ok": false
+          }
+        }
+      }
+    },
+    "09b235c17bb0": {
+      "by-number": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "cache": []
+    },
+    "0e9d6525a582": {
+      "status": "fulfilled",
+      "startedAt": 0,
+      "settledAt": 0,
+      "value": {
+        "displayName": "Repo",
+        "id": "repo-1",
+        "slug": {
+          "$rpc": "null"
+        }
+      }
+    },
+    "135faf86ace7": {
+      "by-number": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "by-slug": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "cache": [
+        [
+          "repo-1",
+          {
+            "error": "inner refused",
+            "ok": false
+          }
+        ]
+      ],
+      "gitlab-path": {
+        "iid": 7,
+        "repoId": "repo-1",
+        "title": "seven"
+      }
+    },
+    "15f59ed83486": {
+      "name": "github.repoSlug#1",
+      "ordinal": 7,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.repoSlug"
+        },
+        {
+          "name": "params",
+          "value": {
+            "repo": "id:repo-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "rejected",
+        "startedAt": 0,
+        "settledAt": 0,
+        "error": {
+          "category": "Error",
+          "message": "transport failure",
+          "isRpcDeliveryUnknown": true
+        }
+      }
+    },
+    "2113a0cc7708": {
+      "by-number": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "by-slug": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "cache": [
+        [
+          "repo-1",
+          {
+            "owner": "owner",
+            "repo": "repo"
+          }
+        ]
+      ],
+      "gitlab-path": {
+        "iid": 7,
+        "repoId": "repo-1",
+        "title": "seven"
+      },
+      "repo-slug": {
+        "displayName": "Repo",
+        "id": "repo-1",
+        "slug": {
+          "$rpc": "null"
+        }
+      }
+    },
+    "268181c644a1": {
+      "name": "github.repoSlug#1",
+      "ordinal": 7,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.repoSlug"
+        },
+        {
+          "name": "params",
+          "value": {
+            "repo": "id:repo-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "rejected",
+        "startedAt": 0,
+        "settledAt": 0,
+        "error": {
+          "category": "Error",
+          "message": "",
+          "isRpcDeliveryUnknown": true
+        }
+      }
+    },
+    "291b7f3e420b": {
+      "name": "github.repoSlug#1",
+      "ordinal": 7,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.repoSlug"
+        },
+        {
+          "name": "params",
+          "value": {
+            "repo": "id:repo-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "id": "frame-4",
+          "ok": true,
+          "result": {
+            "error": "refused"
+          }
+        }
+      }
+    },
+    "40b6e1288e8b": {
+      "name": "github.workItemByOwnerRepo#1",
+      "ordinal": 3,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.workItemByOwnerRepo"
+        },
+        {
+          "name": "params",
+          "value": {
+            "number": 12,
+            "owner": "owner",
+            "ownerRepo": "repo",
+            "repo": "id:repo-1",
+            "type": "issue"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "id": "frame-2",
+          "ok": true,
+          "result": {
+            "number": 12,
+            "title": "twelve"
+          }
+        }
+      }
+    },
+    "467d1db5ad39": {
+      "name": "github.workItem#1",
+      "ordinal": 2,
+      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"github.workItem\",\"params\":{\"repo\":\"id:repo-1\",\"number\":12}}"
+    },
+    "46e234697d93": {
+      "status": "rejected",
+      "startedAt": 0,
+      "settledAt": 0,
+      "error": {
+        "category": "TypeError",
+        "message": "Cannot read properties of undefined (reading 'toLowerCase')",
+        "isRpcDeliveryUnknown": false
+      }
+    },
+    "4a3429622287": {
+      "by-number": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "by-slug": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "cache": [],
+      "gitlab-path": {
+        "iid": 7,
+        "repoId": "repo-1",
+        "title": "seven"
+      }
+    },
+    "4eec4620374a": {
+      "by-number": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "by-slug": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "cache": [
+        [
+          "repo-1",
+          {
+            "error": {
+              "message": "inner refused"
+            },
+            "ok": false
+          }
+        ]
+      ],
+      "gitlab-path": {
+        "iid": 7,
+        "repoId": "repo-1",
+        "title": "seven"
+      }
+    },
+    "4f523a012de1": {
+      "name": "github.repoSlug#1",
+      "ordinal": 7,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.repoSlug"
+        },
+        {
+          "name": "params",
+          "value": {
+            "repo": "id:repo-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "error": {
+            "code": "refused",
+            "message": "outer refused"
+          },
+          "id": "frame-4",
+          "ok": false
+        }
+      }
+    },
+    "54e10e591561": {
+      "name": "gitlab.workItemByPath#1",
+      "ordinal": 5,
+      "args": [
+        {
+          "name": "method",
+          "value": "gitlab.workItemByPath"
+        },
+        {
+          "name": "params",
+          "value": {
+            "host": "gitlab.com",
+            "iid": 7,
+            "path": "group/project",
+            "repo": "id:repo-1",
+            "type": "issue"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "id": "frame-3",
+          "ok": true,
+          "result": {
+            "iid": 7,
+            "title": "seven"
+          }
+        }
+      }
+    },
+    "64b4674b65a8": {
+      "name": "github.workItemByOwnerRepo#1",
+      "ordinal": 4,
+      "json": "{\"id\":\"frame-2\",\"deviceToken\":\"recording-device\",\"method\":\"github.workItemByOwnerRepo\",\"params\":{\"repo\":\"id:repo-1\",\"owner\":\"owner\",\"ownerRepo\":\"repo\",\"number\":12,\"type\":\"issue\"}}"
+    },
+    "72a59aa8bee1": {
+      "name": "github.repoSlug#1",
+      "ordinal": 8,
+      "json": "{\"id\":\"frame-4\",\"deviceToken\":\"recording-device\",\"method\":\"github.repoSlug\",\"params\":{\"repo\":\"id:repo-1\"}}"
+    },
+    "731507dd2e23": {
+      "status": "fulfilled",
+      "startedAt": 0,
+      "settledAt": 0,
+      "value": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      }
+    },
+    "9270aeb7d9c6": {
+      "status": "pending",
+      "startedAt": 0
+    },
+    "94d41597d82a": {
+      "name": "github.repoSlug#1",
+      "ordinal": 7,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.repoSlug"
+        },
+        {
+          "name": "params",
+          "value": {
+            "repo": "id:repo-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "id": "frame-4",
+          "ok": true
+        }
+      }
+    },
+    "a091594f56e6": {
+      "by-number": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "by-slug": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "cache": [
+        [
+          "repo-1",
+          {
+            "$rpc": "null"
+          }
+        ]
+      ],
+      "gitlab-path": {
+        "iid": 7,
+        "repoId": "repo-1",
+        "title": "seven"
+      }
+    },
+    "ad8adb81a6c7": {
+      "name": "github.repoSlug#2",
+      "ordinal": 9,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.repoSlug"
+        },
+        {
+          "name": "params",
+          "value": {
+            "repo": "id:repo-2"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "pending",
+        "startedAt": 0
+      }
+    },
+    "b97e5d2e7180": {
+      "name": "github.repoSlug#1",
+      "ordinal": 7,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.repoSlug"
+        },
+        {
+          "name": "params",
+          "value": {
+            "repo": "id:repo-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "error": {
+            "code": "method_not_found",
+            "message": "Unknown method"
+          },
+          "id": "frame-4",
+          "ok": false
+        }
+      }
+    },
+    "bd533f6b0b40": {
+      "status": "fulfilled",
+      "startedAt": 0,
+      "settledAt": 0,
+      "value": {
+        "iid": 7,
+        "repoId": "repo-1",
+        "title": "seven"
+      }
+    },
+    "bf2cabd50e5a": {
+      "name": "github.workItem#1",
+      "ordinal": 1,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.workItem"
+        },
+        {
+          "name": "params",
+          "value": {
+            "number": 12,
+            "repo": "id:repo-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "id": "frame-1",
+          "ok": true,
+          "result": {
+            "number": 12,
+            "title": "twelve"
+          }
+        }
+      }
+    },
+    "d48fa181d583": {
+      "by-number": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "by-slug": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "cache": [
+        [
+          "repo-1",
+          {
+            "error": "refused"
+          }
+        ]
+      ],
+      "gitlab-path": {
+        "iid": 7,
+        "repoId": "repo-1",
+        "title": "seven"
+      }
+    },
+    "d7c0ded5ee0f": {
+      "name": "github.repoSlug#2",
+      "ordinal": 10,
+      "json": "{\"id\":\"frame-5\",\"deviceToken\":\"recording-device\",\"method\":\"github.repoSlug\",\"params\":{\"repo\":\"id:repo-2\"}}"
+    },
+    "db48adb41100": {
+      "name": "github.repoSlug#1",
+      "ordinal": 7,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.repoSlug"
+        },
+        {
+          "name": "params",
+          "value": {
+            "repo": "id:repo-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "id": "frame-4",
+          "ok": true,
+          "result": {
+            "owner": "owner",
+            "repo": "repo"
+          }
+        }
+      }
+    },
+    "e2af62b90b0b": {
+      "by-number": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "by-slug": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "cache": [
+        [
+          "repo-1",
+          {
+            "$rpc": "null"
+          }
+        ],
+        [
+          "repo-2",
+          {
+            "$rpc": "null"
+          }
+        ]
+      ],
+      "gitlab-path": {
+        "iid": 7,
+        "repoId": "repo-1",
+        "title": "seven"
+      },
+      "repo-slug": {
+        "$rpc": "null"
+      }
+    },
+    "e970eb27f5ca": {
+      "by-number": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "by-slug": {
+        "number": 12,
+        "repoId": "repo-1",
+        "title": "twelve"
+      },
+      "cache": []
+    },
+    "ec92741f4348": {
+      "name": "github.repoSlug#1",
+      "ordinal": 7,
+      "args": [
+        {
+          "name": "method",
+          "value": "github.repoSlug"
+        },
+        {
+          "name": "params",
+          "value": {
+            "repo": "id:repo-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "id": "frame-4",
+          "ok": true,
+          "result": {
+            "error": {
+              "message": "inner refused"
+            },
+            "ok": false
+          }
+        }
+      }
+    },
+    "ee20a1dc39e7": {
+      "status": "fulfilled",
+      "startedAt": 0,
+      "settledAt": 0,
+      "value": {
+        "$rpc": "null"
+      }
+    },
+    "f4d2080c6e99": {
+      "name": "gitlab.workItemByPath#1",
+      "ordinal": 6,
+      "json": "{\"id\":\"frame-3\",\"deviceToken\":\"recording-device\",\"method\":\"gitlab.workItemByPath\",\"params\":{\"repo\":\"id:repo-1\",\"host\":\"gitlab.com\",\"path\":\"group/project\",\"iid\":7,\"type\":\"issue\"}}"
+    }
+  },
+  "recording": {
+    "scenario": "matrix-tasks.paste-lookup-github.reposlug-1",
+    "checkpoints": [
+      {
+        "id": "tw-paste-lookup-resolved.prelude:by-number",
+        "observation": {
+          "sender": ["bf2cabd50e5a"],
+          "payloads": ["467d1db5ad39"],
+          "settlements": {
+            "by-number": "731507dd2e23"
+          },
+          "state": "09b235c17bb0",
+          "effects": []
+        }
+      },
+      {
+        "id": "tw-paste-lookup-resolved.prelude:by-slug",
+        "observation": {
+          "sender": ["bf2cabd50e5a", "40b6e1288e8b"],
+          "payloads": ["467d1db5ad39", "64b4674b65a8"],
+          "settlements": {
+            "by-number": "731507dd2e23",
+            "by-slug": "731507dd2e23"
+          },
+          "state": "e970eb27f5ca",
+          "effects": []
+        }
+      },
+      {
+        "id": "tw-paste-lookup-resolved.prelude:gitlab-path",
+        "observation": {
+          "sender": ["bf2cabd50e5a", "40b6e1288e8b", "54e10e591561"],
+          "payloads": ["467d1db5ad39", "64b4674b65a8", "f4d2080c6e99"],
+          "settlements": {
+            "by-number": "731507dd2e23",
+            "by-slug": "731507dd2e23",
+            "gitlab-path": "bd533f6b0b40"
+          },
+          "state": "4a3429622287",
+          "effects": []
+        }
+      },
+      {
+        "id": "tw-paste-lookup-resolved.normal:repo-slug-matched",
+        "observation": {
+          "sender": ["bf2cabd50e5a", "40b6e1288e8b", "54e10e591561", "db48adb41100"],
+          "payloads": ["467d1db5ad39", "64b4674b65a8", "f4d2080c6e99", "72a59aa8bee1"],
+          "settlements": {
+            "by-number": "731507dd2e23",
+            "by-slug": "731507dd2e23",
+            "gitlab-path": "bd533f6b0b40",
+            "repo-slug": "0e9d6525a582"
+          },
+          "state": "2113a0cc7708",
+          "effects": []
+        }
+      },
+      {
+        "id": "tw-paste-lookup-resolved.result-absent:repo-slug-matched",
+        "observation": {
+          "sender": [
+            "bf2cabd50e5a",
+            "40b6e1288e8b",
+            "54e10e591561",
+            "94d41597d82a",
+            "ad8adb81a6c7"
+          ],
+          "payloads": [
+            "467d1db5ad39",
+            "64b4674b65a8",
+            "f4d2080c6e99",
+            "72a59aa8bee1",
+            "d7c0ded5ee0f"
+          ],
+          "settlements": {
+            "by-number": "731507dd2e23",
+            "by-slug": "731507dd2e23",
+            "gitlab-path": "bd533f6b0b40",
+            "repo-slug": "9270aeb7d9c6"
+          },
+          "state": "a091594f56e6",
+          "effects": []
+        }
+      },
+      {
+        "id": "tw-paste-lookup-resolved.result-null:repo-slug-matched",
+        "observation": {
+          "sender": [
+            "bf2cabd50e5a",
+            "40b6e1288e8b",
+            "54e10e591561",
+            "0576563ad84a",
+            "ad8adb81a6c7"
+          ],
+          "payloads": [
+            "467d1db5ad39",
+            "64b4674b65a8",
+            "f4d2080c6e99",
+            "72a59aa8bee1",
+            "d7c0ded5ee0f"
+          ],
+          "settlements": {
+            "by-number": "731507dd2e23",
+            "by-slug": "731507dd2e23",
+            "gitlab-path": "bd533f6b0b40",
+            "repo-slug": "9270aeb7d9c6"
+          },
+          "state": "a091594f56e6",
+          "effects": []
+        }
+      },
+      {
+        "id": "tw-paste-lookup-resolved.inner-ok-missing:repo-slug-matched",
+        "observation": {
+          "sender": ["bf2cabd50e5a", "40b6e1288e8b", "54e10e591561", "291b7f3e420b"],
+          "payloads": ["467d1db5ad39", "64b4674b65a8", "f4d2080c6e99", "72a59aa8bee1"],
+          "settlements": {
+            "by-number": "731507dd2e23",
+            "by-slug": "731507dd2e23",
+            "gitlab-path": "bd533f6b0b40",
+            "repo-slug": "46e234697d93"
+          },
+          "state": "d48fa181d583",
+          "effects": []
+        }
+      },
+      {
+        "id": "tw-paste-lookup-resolved.inner-false-string-error:repo-slug-matched",
+        "observation": {
+          "sender": ["bf2cabd50e5a", "40b6e1288e8b", "54e10e591561", "0875baed03d5"],
+          "payloads": ["467d1db5ad39", "64b4674b65a8", "f4d2080c6e99", "72a59aa8bee1"],
+          "settlements": {
+            "by-number": "731507dd2e23",
+            "by-slug": "731507dd2e23",
+            "gitlab-path": "bd533f6b0b40",
+            "repo-slug": "46e234697d93"
+          },
+          "state": "135faf86ace7",
+          "effects": []
+        }
+      },
+      {
+        "id": "tw-paste-lookup-resolved.inner-false-object-error:repo-slug-matched",
+        "observation": {
+          "sender": ["bf2cabd50e5a", "40b6e1288e8b", "54e10e591561", "ec92741f4348"],
+          "payloads": ["467d1db5ad39", "64b4674b65a8", "f4d2080c6e99", "72a59aa8bee1"],
+          "settlements": {
+            "by-number": "731507dd2e23",
+            "by-slug": "731507dd2e23",
+            "gitlab-path": "bd533f6b0b40",
+            "repo-slug": "46e234697d93"
+          },
+          "state": "4eec4620374a",
+          "effects": []
+        }
+      },
+      {
+        "id": "tw-paste-lookup-resolved.outer-refused:repo-slug-matched",
+        "observation": {
+          "sender": [
+            "bf2cabd50e5a",
+            "40b6e1288e8b",
+            "54e10e591561",
+            "4f523a012de1",
+            "ad8adb81a6c7"
+          ],
+          "payloads": [
+            "467d1db5ad39",
+            "64b4674b65a8",
+            "f4d2080c6e99",
+            "72a59aa8bee1",
+            "d7c0ded5ee0f"
+          ],
+          "settlements": {
+            "by-number": "731507dd2e23",
+            "by-slug": "731507dd2e23",
+            "gitlab-path": "bd533f6b0b40",
+            "repo-slug": "9270aeb7d9c6"
+          },
+          "state": "a091594f56e6",
+          "effects": []
+        }
+      },
+      {
+        "id": "tw-paste-lookup-resolved.outer-refused-no-message:repo-slug-matched",
+        "observation": {
+          "sender": [
+            "bf2cabd50e5a",
+            "40b6e1288e8b",
+            "54e10e591561",
+            "01ebbe1cc2d6",
+            "ad8adb81a6c7"
+          ],
+          "payloads": [
+            "467d1db5ad39",
+            "64b4674b65a8",
+            "f4d2080c6e99",
+            "72a59aa8bee1",
+            "d7c0ded5ee0f"
+          ],
+          "settlements": {
+            "by-number": "731507dd2e23",
+            "by-slug": "731507dd2e23",
+            "gitlab-path": "bd533f6b0b40",
+            "repo-slug": "9270aeb7d9c6"
+          },
+          "state": "a091594f56e6",
+          "effects": []
+        }
+      },
+      {
+        "id": "tw-paste-lookup-resolved.method-not-found:repo-slug-matched",
+        "observation": {
+          "sender": ["bf2cabd50e5a", "40b6e1288e8b", "54e10e591561", "b97e5d2e7180"],
+          "payloads": ["467d1db5ad39", "64b4674b65a8", "f4d2080c6e99", "72a59aa8bee1"],
+          "settlements": {
+            "by-number": "731507dd2e23",
+            "by-slug": "731507dd2e23",
+            "gitlab-path": "bd533f6b0b40",
+            "repo-slug": "ee20a1dc39e7"
+          },
+          "state": "e2af62b90b0b",
+          "effects": []
+        }
+      },
+      {
+        "id": "tw-paste-lookup-resolved.transport-rejection:repo-slug-matched",
+        "observation": {
+          "sender": [
+            "bf2cabd50e5a",
+            "40b6e1288e8b",
+            "54e10e591561",
+            "15f59ed83486",
+            "ad8adb81a6c7"
+          ],
+          "payloads": [
+            "467d1db5ad39",
+            "64b4674b65a8",
+            "f4d2080c6e99",
+            "72a59aa8bee1",
+            "d7c0ded5ee0f"
+          ],
+          "settlements": {
+            "by-number": "731507dd2e23",
+            "by-slug": "731507dd2e23",
+            "gitlab-path": "bd533f6b0b40",
+            "repo-slug": "9270aeb7d9c6"
+          },
+          "state": "a091594f56e6",
+          "effects": []
+        }
+      },
+      {
+        "id": "tw-paste-lookup-resolved.transport-rejection-no-message:repo-slug-matched",
+        "observation": {
+          "sender": [
+            "bf2cabd50e5a",
+            "40b6e1288e8b",
+            "54e10e591561",
+            "268181c644a1",
+            "ad8adb81a6c7"
+          ],
+          "payloads": [
+            "467d1db5ad39",
+            "64b4674b65a8",
+            "f4d2080c6e99",
+            "72a59aa8bee1",
+            "d7c0ded5ee0f"
+          ],
+          "settlements": {
+            "by-number": "731507dd2e23",
+            "by-slug": "731507dd2e23",
+            "gitlab-path": "bd533f6b0b40",
+            "repo-slug": "9270aeb7d9c6"
+          },
+          "state": "a091594f56e6",
+          "effects": []
+        }
+      }
+    ]
+  }
+}

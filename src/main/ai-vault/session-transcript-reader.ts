@@ -1,6 +1,6 @@
 import { readTranscriptSlice } from '../native-chat/wsl-transcript-fs-access'
 import type { AiVaultSession } from '../../shared/ai-vault-types'
-import { parseAgentSessionFile, parserPublishesMessages } from './session-scanner-agent-parser'
+import { parseAgentSessionFile } from './session-scanner-agent-parser'
 import { consumeCompleteJsonlLines } from './session-scanner-jsonl-reader'
 import type { ResumableSessionParseState, SessionFileCandidate } from './session-scanner-types'
 import {
@@ -68,6 +68,9 @@ export async function readResumableTranscript(args: {
     resume !== null &&
     typeof file.sizeBytes === 'number' &&
     file.sizeBytes >= resume.byteOffset &&
+    file.mtimeMs >= resume.mtimeMs &&
+    // A changed timestamp without growth signals a rewrite, even at a valid line boundary.
+    (file.mtimeMs === resume.mtimeMs || file.sizeBytes > (resume.sizeBytes ?? resume.byteOffset)) &&
     (resume.byteOffset === 0 || (await endsWithNewlineAt(file.path, resume.byteOffset)))
 
   // Clone before consuming: a failed read must not corrupt the cached state,
@@ -127,7 +130,13 @@ export async function readResumableTranscript(args: {
     channel.finishRead({ session, byteOffset: readResult.consumedThrough, incomplete: false })
     return {
       session,
-      resume: { state, byteOffset: readResult.consumedThrough, channel }
+      resume: {
+        state,
+        byteOffset: readResult.consumedThrough,
+        mtimeMs: file.mtimeMs,
+        sizeBytes: file.sizeBytes,
+        channel
+      }
     }
   } catch (error) {
     channel.finishRead({ session: null, byteOffset: startOffset, incomplete: true })
@@ -150,12 +159,11 @@ export async function readWholeTranscript(args: {
     args.stats.fullParses++
     args.stats.bytesRead += file.sizeBytes ?? 0
   }
-  const publishes = parserPublishesMessages(args.candidate)
   const channel = new TranscriptMessageChannel()
   channel.beginRead({ candidate: args.candidate, mode: 'replace', previousByteOffset: 0 })
   try {
     const session = await parseAgentSessionFile(args.candidate, args.platform, channel)
-    channel.finishRead({ session, byteOffset: file.sizeBytes ?? 0, incomplete: !publishes })
+    channel.finishRead({ session, byteOffset: file.sizeBytes ?? 0, incomplete: false })
     return session
   } catch (error) {
     channel.finishRead({ session: null, byteOffset: 0, incomplete: true })

@@ -975,8 +975,13 @@ section('21. runtime capability advertisement')
     (() => {
       const params = mobileRuntimeClientCapabilityUpdateParams()
       const list = params.clientCapabilities as string[]
+      // Measured against our own length, not the reference's: comparing to the
+      // reference only proved the two lists were the same size, so this check
+      // failed for an unrelated reason whenever the copy was one entry behind
+      // the capability change it was meant to report.
+      const before = MOBILE_RUNTIME_CLIENT_CAPABILITIES.length
       list.push('mutated')
-      return MOBILE_RUNTIME_CLIENT_CAPABILITIES.length === REFERENCE_CAPABILITIES.length
+      return MOBILE_RUNTIME_CLIENT_CAPABILITIES.length === before
     })()
   )
 }

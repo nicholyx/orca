@@ -6,7 +6,7 @@ import type {
 } from '../../shared/agent-session-journal-types'
 import { agentJournalItemKey } from '../../shared/agent-session-journal-item-key'
 import { agentJournalTurnBody } from '../../shared/agent-session-turn-record'
-import { CODEX_USER_MESSAGE_ORDINAL } from './codex-structured-turn-start'
+import { CODEX_USER_MESSAGE_ORDINAL } from './codex-turn-ordinals'
 import type {
   StructuredAgentSessionEventSink,
   StructuredAgentSessionSinkAdmission
@@ -56,7 +56,9 @@ export function publishCodexTurnLifecycle(input: {
   threadId: string
   turnId: string
   state: AgentJournalTurnLifecycleState
+  userItemId?: string
   startedAt?: number
+  requestedAt?: number
   completedAt?: number
   durationMs?: number
 }): StructuredAgentSessionSinkAdmission {
@@ -67,8 +69,9 @@ export function publishCodexTurnLifecycle(input: {
   const body = codexTurnLifecycleBody({
     turnId: input.turnId,
     state: input.state,
-    userItemId: codexTurnUserItemId(input.threadId, input.turnId),
+    userItemId: input.userItemId ?? codexTurnUserItemId(input.threadId, input.turnId),
     ...(input.startedAt !== undefined ? { startedAt: input.startedAt } : {}),
+    ...(input.requestedAt !== undefined ? { requestedAt: input.requestedAt } : {}),
     ...(input.completedAt !== undefined ? { completedAt: input.completedAt } : {}),
     ...(input.durationMs !== undefined ? { durationMs: input.durationMs } : {})
   })

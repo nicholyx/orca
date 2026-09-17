@@ -74,10 +74,11 @@ export function runHandshakeSections(): void {
     check('validateReady decodes desktop nonce', validated !== null && equalHex(validated.desktopNonce, desktopNonce))
 
     {
-      const referenceHandshake: MobileE2EEV2Handshake = validateMobileE2EEV2Handshake(
-        hello as never,
-        readyDocument as never
-      )!
+      // SAFETY: the reference validators are typed for the React Native client's own
+      // document types; this harness hands them the same bytes the ArkTS port produced,
+      // which is the comparison being made.
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: cross-implementation equality is the test; only the nominal type differs.
+      const referenceHandshake: MobileE2EEV2Handshake = validateMobileE2EEV2Handshake(hello as never, readyDocument as never)!
       check('reference accepts the same ready', referenceHandshake !== null)
       const expectedTranscript = encodeMobileE2EEV2Transcript(referenceHandshake)
       bytesEqualCheck('transcript matches reference', validated!.transcript, expectedTranscript)
@@ -107,6 +108,7 @@ export function runHandshakeSections(): void {
       }
       const relayValidated = hContract.validateReady(relayHello, relayReady)
       check('validateReady accepts relay ready', relayValidated !== null)
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: same cross-implementation comparison as above.
       const referenceRelay = validateMobileE2EEV2Handshake(relayHello as never, relayReady as never)!
       bytesEqualCheck('relay transcript matches reference', relayValidated!.transcript, encodeMobileE2EEV2Transcript(referenceRelay))
       check('direct and relay transcripts differ', !equalHex(validated!.transcript, relayValidated!.transcript))
@@ -156,9 +158,13 @@ export function runHandshakeSections(): void {
       ['a non-object', 42]
     ]
     for (const [label, candidate] of rejections) {
+      // SAFETY: the corpus deliberately includes a number to pin how the contract refuses
+      // a non-object candidate — exactly what the ArkTS signature cannot express.
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the non-object case must reach the validator unchanged.
       const ours = hContract.validateReady(hello, candidate as object)
       let referenceRejects = false
       try {
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: same cross-implementation comparison as above, including the deliberate non-object candidate.
         referenceRejects = validateMobileE2EEV2Handshake(hello as never, candidate as never) === null
       } catch {
         referenceRejects = true

@@ -17,7 +17,7 @@ import { DEVICE_TOKEN, DESKTOP_SECRET, startClient, waitFor } from './e2e-client
 import { runTailScenarios } from './e2e-scenarios-tail'
 
 import { MOBILE_RUNTIME_CLIENT_CAPABILITIES } from '../../entry/src/main/ets/core/rpc/MobileRuntimeCapabilities.ets'
-import { asArray, asString } from '../../entry/src/main/ets/core/json/JsonValue.ets'
+import { asArray, asRecord, asString, parseJsonRecord } from '../../entry/src/main/ets/core/json/JsonValue.ets'
 
 /** Scenario driver. A single async body, so the bundle needs no top-level await. */
 async function main(): Promise<void> {
@@ -100,7 +100,7 @@ section('E2E-3. terminal list + subscribe + stream')
     'terminal.subscribe',
     { terminal: 'term-1', cols: 80, rows: 24, client: { id: 'viewer-1' } },
     (result: object | null) => {
-      const record = result as Record<string, object> | null
+      const record = asRecord(result)
       if (record === null) {return}
       const type = asString(record.type)
       if (type === null) {return}
@@ -204,14 +204,9 @@ section('E2E-5. confidentiality of the wire')
   check('the desktop saw at least three frames', sentFrames.length >= 3, `frames=${sentFrames.length}`)
 
   const hello = sentFrames[0]
-  let helloParsed: Record<string, object> | null = null
-  if (typeof hello === 'string') {
-    try {
-      helloParsed = JSON.parse(hello) as Record<string, object>
-    } catch {
-      helloParsed = null
-    }
-  }
+  // parseJsonRecord rejects malformed JSON, arrays and scalars — the same set the
+  // try/catch used to collapse to "no parseable hello".
+  const helloParsed = typeof hello === 'string' ? parseJsonRecord(hello) : null
   check(
     'the only plaintext frame is the e2ee_hello',
     helloParsed !== null && helloParsed.type === 'e2ee_hello' && helloParsed.v === 2,

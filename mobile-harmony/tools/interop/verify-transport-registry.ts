@@ -8,6 +8,7 @@ import { check, section, jsonEqual } from './harness'
 import * as hTerminal from '../../entry/src/main/ets/core/rpc/TerminalStreamProtocol.ets'
 import * as hRpc from '../../entry/src/main/ets/core/rpc/RpcProtocol.ets'
 import { RpcStreamRegistry } from '../../entry/src/main/ets/core/rpc/RpcStreamRegistry.ets'
+import { asRecord, asString } from '../../entry/src/main/ets/core/json/JsonValue.ets'
 import {
   MOBILE_RUNTIME_CLIENT_CAPABILITIES,
   MOBILE_RUNTIME_CLIENT_CAPABILITY_UPDATE_METHOD,
@@ -47,7 +48,7 @@ export function runRegistrySections(): void {
           sent.push({
             id: request.id,
             method: request.method,
-            params: (request.params ?? {}) as Record<string, object>
+            params: asRecord(request.params) ?? {}
           })
           return true
         }
@@ -75,7 +76,7 @@ export function runRegistrySections(): void {
       registry.handleBinary(
         hTerminal.encodeTerminalStreamFrame({ opcode: 1, streamId: 33, seq: 0, payload: encoder.encode('hi') })
       )
-      check('a binary frame reached the listener', results.length === 2 && (results[1] as { chunk: string }).chunk === 'hi')
+      check('a binary frame reached the listener', results.length === 2 && asString(asRecord(results[1])?.chunk) === 'hi')
 
       cancel()
       check('cancel sent the terminal unsubscribe', sent.length === 2 && sent[1].method === 'terminal.unsubscribe')
@@ -127,7 +128,7 @@ export function runRegistrySections(): void {
       registry.subscribe('terminal.subscribe', { terminal: 't2' }, (result) => results.push(result))
       const failure = hRpc.readRpcResponse({ id: sent[0].id, ok: false, error: { code: 'nope', message: 'no terminal' } })!
       check('a failed opener is consumed', registry.handleResponse(failure))
-      check('a failed opener became an error event', results.length === 1 && (results[0] as { type: string }).type === 'error')
+      check('a failed opener became an error event', results.length === 1 && asString(asRecord(results[0])?.type) === 'error')
       check('the failed stream was dropped', registry.size() === 0)
     }
 
@@ -195,6 +196,11 @@ export function runRegistrySections(): void {
       'advertised params do not alias the constant',
       (() => {
         const params = mobileRuntimeClientCapabilityUpdateParams()
+        // SAFETY: the assertion below is about identity — it mutates the returned
+        // array and then checks the exported constant did not change. A copying
+        // accessor (asStringArray) would make it pass no matter what, so the
+        // reference itself has to come through.
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: aliasing is the property under test; narrowing must not copy.
         const list = params.clientCapabilities as string[]
         // Measured against our own length, not the reference's: comparing to the
         // reference only proved the two lists were the same size, so this check

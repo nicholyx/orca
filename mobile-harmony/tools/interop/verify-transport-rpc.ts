@@ -15,6 +15,7 @@ import {
 } from '../../../mobile/src/transport/rpc-client-terminal-subscription'
 import { buildReadyStreamUnsubscribe } from '../../../mobile/src/transport/rpc-client-server-subscription'
 import { createWsOutboundBackpressureQueue } from '../../../src/shared/ws-outbound-backpressure-queue'
+import { asNumber, asRecord, asString } from '../../entry/src/main/ets/core/json/JsonValue.ets'
 import { FakeClock } from './verify-transport-clock'
 
 export function runRpcShapeSections(): void {
@@ -47,7 +48,7 @@ export function runRpcShapeSections(): void {
     ]
 
     for (const [label, text] of corpus) {
-      const parsed = JSON.parse(text)
+      const parsed: Record<string, unknown> = JSON.parse(text)
       const ours = hRpc.readRpcResponse(parsed)
       const reference = isRpcResponse(parsed)
       check(
@@ -56,7 +57,7 @@ export function runRpcShapeSections(): void {
         `ours=${ours !== null} reference=${reference}`
       )
       if (ours !== null && reference) {
-        check(`response id is preserved: ${label}`, ours.id === (parsed as { id: string }).id)
+        check(`response id is preserved: ${label}`, ours.id === asString(parsed.id))
       }
     }
 
@@ -72,7 +73,10 @@ export function runRpcShapeSections(): void {
     check('isUnauthorizedRefusal', hRpc.isUnauthorizedRefusal(hRpc.readRpcResponse(JSON.parse('{"id":"i","ok":false,"error":{"code":"unauthorized","message":"m"}}'))!))
     check(
       'requireRpcResultOrThrowCodedError returns the result',
-      (hRpc.requireRpcResultOrThrowCodedError(hRpc.readRpcResponse(JSON.parse(corpus[0][1]))!) as Record<string, object>).a === 1
+      asNumber(
+        asRecord(hRpc.requireRpcResultOrThrowCodedError(hRpc.readRpcResponse(JSON.parse(corpus[0][1]))!))
+          ?.a
+      ) === 1
     )
     check(
       'requireRpcResultOrThrowCodedError throws on failure',
@@ -81,7 +85,7 @@ export function runRpcShapeSections(): void {
           hRpc.requireRpcResultOrThrowCodedError(hRpc.readRpcResponse(JSON.parse(corpus[6][1]))!)
           return false
         } catch (error) {
-          return (error as Error).message === 'boom: bad'
+          return error instanceof Error && error.message === 'boom: bad'
         }
       })()
     )
@@ -106,7 +110,7 @@ export function runRpcShapeSections(): void {
   section('16. unsubscribe builders')
 
   {
-    const terminalCorpus: unknown[] = [
+    const terminalCorpus: (object | null)[] = [
       { terminal: 't1' },
       { terminal: 't1', client: { id: 'c9' } },
       { terminal: 't1', client: {} },
@@ -116,7 +120,7 @@ export function runRpcShapeSections(): void {
       null
     ]
     for (const params of terminalCorpus) {
-      const ours = hUnsub.buildTerminalUnsubscribeParams(params as object | null)
+      const ours = hUnsub.buildTerminalUnsubscribeParams(params)
       const reference = buildTerminalUnsubscribeParams(params)
       check(
         `terminal unsubscribe params match for ${JSON.stringify(params)}`,
@@ -125,7 +129,7 @@ export function runRpcShapeSections(): void {
       )
     }
 
-    const streamCorpus: [string | undefined, unknown][] = [
+    const streamCorpus: [string | undefined, object | null][] = [
       ['session.tabs.subscribe', { worktree: '/w/1' }],
       ['session.tabs.subscribe', {}],
       ['nativeChat.subscribe', { subscriptionId: 'a:b' }],
@@ -138,7 +142,11 @@ export function runRpcShapeSections(): void {
       ['session.tabs.subscribe', null]
     ]
     for (const [method, params] of streamCorpus) {
-      const ours = hUnsub.buildStreamUnsubscribe(method as string, params as object | null)
+      // SAFETY: the corpus deliberately carries an `undefined` method to pin how the
+      // reference refuses it, and the ArkTS signature wants a string. `as` is erased at
+      // runtime, so the undefined still reaches the function under test.
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: see above; the undefined entry must reach the builder unchanged.
+      const ours = hUnsub.buildStreamUnsubscribe(method as string, params)
       const reference = buildStreamUnsubscribe(method, params)
       check(
         `stream unsubscribe matches for ${method} ${JSON.stringify(params)}`,

@@ -199,21 +199,27 @@ class StubWebSocket {
 
   on(type: string, callback: (...args: never[]) => void): void {
     if (type === 'open') {
+      // SAFETY: `on` mirrors @kit.NetworkKit's dynamic dispatcher, which is typed by
+      // event name; the stub stores each handler under the shape its emitter calls it with.
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the dispatcher is dynamic by construction and the emitters below invoke each slot with the shape asserted here.
       this.handlers.open = callback as unknown as (error: unknown, value: unknown) => void
     }
     if (type === 'message') {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: same dynamic dispatcher as `on('open')` above.
       this.handlers.message = callback as unknown as (
         error: unknown,
         value: string | ArrayBuffer
       ) => void
     }
     if (type === 'close') {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: same dynamic dispatcher as `on('open')` above.
       this.handlers.close = callback as unknown as (
         error: unknown,
         value: { code: number; reason: string }
       ) => void
     }
     if (type === 'error') {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: same dynamic dispatcher as `on('open')` above.
       this.handlers.error = callback as unknown as (error: unknown) => void
     }
   }

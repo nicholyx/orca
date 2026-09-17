@@ -121,6 +121,9 @@ export function createEnvironment(): Environment {
     scanResult
   })
 
+  // SAFETY: the context is only forwarded to the platform adapters, and installKit
+  // replaces every one of them before the first call, so no member is ever read.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: no real common.Context can exist off-device, and the fake @kit layer never reads this one.
   const connection = new OrcaConnection({} as never)
   return {
     connection,

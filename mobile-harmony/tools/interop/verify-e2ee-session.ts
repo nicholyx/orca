@@ -88,6 +88,9 @@ export function runSessionSections(): void {
     check('session tolerates a repeated ready', session.acceptReady(readyDocument))
 
     // Independent desktop-side derivation, using the reference modules only.
+    // SAFETY: the reference validator is typed for the React Native client's own
+    // document types; this harness hands it the same bytes the ArkTS session built.
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: cross-implementation equality is the test; only the nominal type differs.
     const referenceHandshake = validateMobileE2EEV2Handshake(session.hello as never, readyDocument as never)!
     const referenceSchedule = deriveMobileE2EEV2KeySchedule({
       sharedSecret: nacl.box.before(clientKeyPair.publicKey, desktopSecret),

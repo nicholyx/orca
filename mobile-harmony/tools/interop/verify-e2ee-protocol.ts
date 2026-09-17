@@ -54,7 +54,7 @@ export function runProtocolSections(): void {
     const key = fixture(32, 31000)
     const sessionId = fixture(32, 31001)
     const directions: MobileE2EEDirection[] = ['mobile-to-desktop', 'desktop-to-mobile']
-    const kinds = ['text', 'binary']
+    const kinds: ('text' | 'binary')[] = ['text', 'binary']
     const counters = [0, 1, 255, 256, 65535, 0x1_0000_0000, 2 ** 40, Number.MAX_SAFE_INTEGER]
 
     for (const direction of directions) {
@@ -68,7 +68,7 @@ export function runProtocolSections(): void {
               key,
               sessionId,
               direction,
-              payloadKind: kind as 'text' | 'binary',
+              payloadKind: kind,
               counter: BigInt(counter)
             })
             const label = `${direction}/${kind}/counter=${counter}/len=${payloadLength}`
@@ -92,7 +92,7 @@ export function runProtocolSections(): void {
               key,
               sessionId,
               direction,
-              payloadKind: kind as 'text' | 'binary',
+              payloadKind: kind,
               expectedCounter: BigInt(counter)
             })
             check(
@@ -137,13 +137,14 @@ export function runProtocolSections(): void {
         })()
       })
 
-      for (const [label, bad] of [
+      const malformed: [string, typeof args][] = [
         ['a short key', { ...args, key: new Uint8Array(31) }],
         ['a short session id', { ...args, sessionId: new Uint8Array(31) }],
         ['a fractional counter', { ...args, counter: 1.5 }],
         ['a negative counter', { ...args, counter: -1 }],
         ['an unsafe counter', { ...args, counter: 2 ** 53 }]
-      ] as [string, typeof args][]) {
+      ]
+      for (const [label, bad] of malformed) {
         check(
           `seal rejects ${label}`,
           (() => {

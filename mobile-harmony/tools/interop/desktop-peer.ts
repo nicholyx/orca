@@ -28,6 +28,12 @@ import {
   encodeTerminalStreamFrame
 } from '../../../mobile/src/transport/terminal-stream-protocol'
 import type { PipeSide } from './pipe-side'
+import {
+  asRecord,
+  asString,
+  asStringArray,
+  parseJsonRecord
+} from '../../entry/src/main/ets/core/json/JsonValue.ets'
 
 const encoder = new TextEncoder()
 
@@ -35,7 +41,7 @@ export type DesktopRequest = {
   id: string
   deviceToken: string
   method: string
-  params?: unknown
+  params?: object
 }
 
 export type DesktopPeerOptions = {
@@ -146,21 +152,20 @@ export class DesktopPeer {
   }
 
   private handleHello(raw: string): void {
-    let hello: object
-    try {
-      hello = JSON.parse(raw) as object
-    } catch {
+    // parseJsonRecord rejects malformed JSON, arrays and scalars alike, which is
+    // the same set this handshake owes a refusal to.
+    const record = parseJsonRecord(raw)
+    if (record === null) {
       this.fail('hello was not JSON')
       return
     }
     // Only v2 is accepted: the client under test must never fall back to legacy.
-    const record = hello as Record<string, object>
     if (record.type !== 'e2ee_hello' || record.v !== 2) {
       this.fail(`unexpected hello type/version: ${String(record.type)}/${String(record.v)}`)
       return
     }
     const session = DesktopMobileE2EEV2Session.create({
-      hello,
+      hello: record,
       serverSecretKey: this.options.serverSecret,
       expectedContext: { transport: 'direct' }
     })
@@ -204,7 +209,9 @@ export class DesktopPeer {
   private handleText(plaintext: string): void {
     let request: DesktopRequest
     try {
-      request = JSON.parse(plaintext) as DesktopRequest
+      // JSON.parse is `any`, so the annotation lands the shape the stub needs
+      // without an assertion.
+      request = JSON.parse(plaintext)
     } catch {
       return
     }
@@ -214,9 +221,9 @@ export class DesktopPeer {
     this.rpcMethods.push(request.method)
     this.rpcRequests.push(request)
     if (request.method === 'runtime.clientCapabilities.update') {
-      const params = request.params as Record<string, object> | undefined
-      const list = params === undefined ? [] : params.clientCapabilities
-      this.capabilityAdvertisements.push(Array.isArray(list) ? (list as string[]) : [])
+      const params = asRecord(request.params)
+      const list = params === null ? null : params.clientCapabilities
+      this.capabilityAdvertisements.push(asStringArray(list) ?? [])
     }
     this.reply(request)
   }
@@ -242,9 +249,9 @@ export class DesktopPeer {
       return
     }
     if (request.method === 'terminal.subscribe') {
-      const params = (request.params ?? {}) as Record<string, object>
+      const params = asRecord(request.params) ?? {}
       this.terminalSubscribeParams.push(params)
-      const terminal = typeof params.terminal === 'string' ? (params.terminal as string) : ''
+      const terminal = asString(params.terminal) ?? ''
       const streamId = this.nextStreamId++
       this.streamIdByTerminal.set(terminal, streamId)
       this.subscribedStreamIds.push(streamId)
@@ -260,15 +267,15 @@ export class DesktopPeer {
       return
     }
     if (request.method === 'terminal.unsubscribe') {
-      this.terminalUnsubscribeParams.push((request.params ?? {}) as Record<string, object>)
+      this.terminalUnsubscribeParams.push(asRecord(request.params) ?? {})
       this.sendSealedText(
         JSON.stringify({ id: request.id, ok: true, result: {}, _meta: meta })
       )
       return
     }
     if (request.method === 'terminal.send') {
-      const params = (request.params ?? {}) as Record<string, object>
-      this.terminalSendTexts.push(typeof params.text === 'string' ? (params.text as string) : '')
+      const params = asRecord(request.params) ?? {}
+      this.terminalSendTexts.push(asString(params.text) ?? '')
       this.sendSealedText(JSON.stringify({ id: request.id, ok: true, result: {}, _meta: meta }))
       return
     }

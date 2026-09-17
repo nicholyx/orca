@@ -70,9 +70,10 @@ export function jsonEqual(a: unknown, b: unknown): boolean {
 function sortDeep(value: unknown): unknown {
   if (Array.isArray(value)) {return value.map(sortDeep)}
   if (value !== null && typeof value === 'object') {
-    const source = value as Record<string, unknown>
     const out: Record<string, unknown> = {}
-    for (const key of Object.keys(source).sort()) {out[key] = sortDeep(source[key])}
+    // Object.entries on the narrowed object needs no cast, where indexing it would.
+    const entries = Object.entries(value).sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    for (const [key, entry] of entries) {out[key] = sortDeep(entry)}
     return out
   }
   return value

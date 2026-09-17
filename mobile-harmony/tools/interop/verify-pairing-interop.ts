@@ -197,7 +197,7 @@ section('25. invite-expiry boundary')
     const json = validOfferJson({
       relay: relayObject({ inviteExpiresAt: FIXED_NOW + offset })
     })
-    const value = JSON.parse(json) as Record<string, unknown>
+    const value: Record<string, unknown> = JSON.parse(json)
     const ours = validatePairingOffer(value, () => FIXED_NOW)
     const theirs = schema.safeParse(value)
     check(
@@ -216,7 +216,7 @@ section('25. invite-expiry boundary')
   const boundary = validOfferJson({
     relay: relayObject({ inviteExpiresAt: FIXED_NOW + maxTtl + skew })
   })
-  const boundaryValue = JSON.parse(boundary) as Record<string, unknown>
+  const boundaryValue: Record<string, unknown> = JSON.parse(boundary)
   check(
     'exact max-TTL-plus-skew boundary is accepted by both',
     validatePairingOffer(boundaryValue, () => FIXED_NOW) !== null && schema.safeParse(boundaryValue).success
@@ -241,7 +241,7 @@ section('26. accepted-offer shape parity')
     })
   ]
   for (const json of shapes) {
-    const value = JSON.parse(json) as Record<string, unknown>
+    const value: Record<string, unknown> = JSON.parse(json)
     const ours = validatePairingOffer(value, () => FIXED_NOW)
     const theirs = schema.safeParse(value)
     check(`accepted shape parses on both sides: ${json.slice(0, 60)}…`, ours !== null && theirs.success)
@@ -277,6 +277,7 @@ section('27. host naming')
   for (const list of lists) {
     // SAFETY: read-only shape check — the ArkTS signature accepts HostProfile[]
     // but only reads `name`, matching the reference's HostNameSource.
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the port reads only `name` from each entry, which every HostNameSource satisfies; the nominal HostProfile type is not constructible here.
     const ours = getNextHostNameFromHosts(list as never)
     const theirs = refNextHostName(list)
     check(
@@ -299,16 +300,16 @@ section('28. stored host profile parsing')
    * drop anything that still carries a legacy `deviceToken`, then validate with
    * the real schema. Returns null for an unreadable payload.
    */
-  function referenceParse(raw: string): Record<string, unknown>[] | null {
+  function referenceParse(raw: string): object[] | null {
     if (!raw) {return []}
     try {
-      const parsed = JSON.parse(raw) as unknown
+      const parsed: unknown = JSON.parse(raw)
       if (!Array.isArray(parsed)) {return null}
-      const out: Record<string, unknown>[] = []
+      const out: object[] = []
       for (const item of parsed) {
         if (item && typeof item === 'object' && 'deviceToken' in item) {continue}
         const result = StoredHostProfileSchema.safeParse(item)
-        if (result.success) {out.push(result.data as Record<string, unknown>)}
+        if (result.success) {out.push(result.data)}
       }
       return out
     } catch {

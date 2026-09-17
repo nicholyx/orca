@@ -30,7 +30,12 @@ export const MOBILE_RUNTIME_CLIENT_CAPABILITIES: string[] = [
   'agent-session.structured.v1',
   'agent-session.pending-send-result.v1',
   'agent-session.structured.hold.v1',
-  'agent-session.structured.claude.v1'
+  'agent-session.structured.claude.v1',
+  // Both appended here because the reference builds a de-duplicated
+  // insertion-ordered set: these are the mobile-only entries added after
+  // agent-session.structured.claude.v1 upstream.
+  'session-tabs.split-group-placement.v1',
+  'agent.launch.v2'
 ];
 
 export function mobileRuntimeClientCapabilityUpdateParams(): Record<string, Object> {

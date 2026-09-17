@@ -28,10 +28,13 @@ if (!oracleModules) {
   process.exit(2)
 }
 
-// createRequire honours NODE_PATH, unlike the ESM resolver, so esbuild itself is
-// found through the same isolated workspace.
+// Resolve esbuild from the oracle workspace by path rather than through
+// NODE_PATH. Only run-interop.sh exports NODE_PATH, so a bare `node build.mjs`
+// used to die here — and, worse, die *before* rewriting `.build/`, leaving the
+// previous bundle in place for whatever ran next to load. A verifier that can
+// silently test a stale artifact is worse than one that fails loudly.
 const require = createRequire(import.meta.url)
-const { build } = require('esbuild')
+const { build } = require(require.resolve('esbuild', { paths: [oracleModules] }))
 
 /** Rewrites every HarmonyOS kit import to the controllable stub. */
 const kitStubPlugin = {

@@ -26,6 +26,12 @@ Runs in about 4 seconds, needs no emulator or device.
 | `check-syntax`              | static           | import resolution, ArkTS subset rules, the `core/` layering rule       |
 | `check-arkui`               | static           | page registration, `struct`/`build()`, resource references, `ForEach` keys |
 
+Each suite is an entry point that runs its layers in order; the layers
+themselves live in sibling modules (`verify-e2ee-*.ts`, `verify-transport-*.ts`,
+`e2e-*.ts`), and the shared plumbing is `harness.ts`. Splitting them is what
+keeps every file inside the repo's line budget — the entry points are the names
+above, so the commands are unchanged.
+
 Current totals:
 
 ```

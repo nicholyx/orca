@@ -13,9 +13,8 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 
-const here = dirname(fileURLToPath(import.meta.url))
+const here = import.meta.dirname
 const project = resolve(here, '..', '..')
 const moduleRoot = join(project, 'entry/src/main')
 const etsRoot = join(moduleRoot, 'ets')
@@ -26,7 +25,7 @@ let checks = 0
 function fail(label, detail) {
   failures++
   console.error(`FAIL  ${label}`)
-  if (detail) console.error(`      ${detail}`)
+  if (detail) {console.error(`      ${detail}`)}
 }
 
 function ok(label) {
@@ -44,11 +43,11 @@ function parseJsonc(text) {
 }
 
 function collect(dir, filter, out = []) {
-  if (!existsSync(dir)) return out
+  if (!existsSync(dir)) {return out}
   for (const name of readdirSync(dir)) {
     const full = join(dir, name)
-    if (statSync(full).isDirectory()) collect(full, filter, out)
-    else if (filter(name)) out.push(full)
+    if (statSync(full).isDirectory()) {collect(full, filter, out)}
+    else if (filter(name)) {out.push(full)}
   }
   return out
 }
@@ -115,7 +114,7 @@ for (const file of uiFiles) {
     let depth = 0
     let end = bodyStart
     for (let index = bodyStart; index < source.length; index++) {
-      if (source[index] === '{') depth++
+      if (source[index] === '{') {depth++}
       else if (source[index] === '}') {
         depth--
         if (depth === 0) {
@@ -152,23 +151,23 @@ function buildResourceIndex() {
     join(project, 'AppScope/resources')
   ]
   for (const root of roots) {
-    if (!existsSync(root)) continue
+    if (!existsSync(root)) {continue}
     for (const locale of readdirSync(root)) {
       const elementDir = join(root, locale, 'element')
       for (const name of ['string.json', 'color.json']) {
         const file = join(elementDir, name)
-        if (!existsSync(file)) continue
+        if (!existsSync(file)) {continue}
         const parsed = parseJsonc(readFileSync(file, 'utf8'))
         const bucket = name.startsWith('string') ? 'string' : 'color'
-        for (const item of parsed[bucket] ?? []) index[bucket].add(item.name)
+        for (const item of parsed[bucket] ?? []) {index[bucket].add(item.name)}
       }
       const mediaDir = join(root, locale, 'media')
       if (existsSync(mediaDir)) {
-        for (const name of readdirSync(mediaDir)) index.media.add(name.replace(/\.[^.]+$/, ''))
+        for (const name of readdirSync(mediaDir)) {index.media.add(name.replace(/\.[^.]+$/, ''))}
       }
       const profileDir = join(root, locale, 'profile')
       if (existsSync(profileDir)) {
-        for (const name of readdirSync(profileDir)) index.profile.add(name.replace(/\.json$/, ''))
+        for (const name of readdirSync(profileDir)) {index.profile.add(name.replace(/\.json$/, ''))}
       }
     }
   }
@@ -220,7 +219,7 @@ for (const file of configFiles) {
 const profileDir = join(moduleRoot, 'resources/base/profile')
 if (existsSync(profileDir)) {
   for (const name of readdirSync(profileDir)) {
-    if (!name.endsWith('.json')) continue
+    if (!name.endsWith('.json')) {continue}
     try {
       JSON.parse(readFileSync(join(profileDir, name), 'utf8'))
       ok(`profile ${name} is strict JSON`)
@@ -271,11 +270,11 @@ function countArguments(source, openParen) {
   let count = 1
   for (let index = openParen; index < source.length; index++) {
     const char = source[index]
-    if (char === '(' || char === '[' || char === '{') depth++
+    if (char === '(' || char === '[' || char === '{') {depth++}
     else if (char === ')' || char === ']' || char === '}') {
       depth--
-      if (depth === 0) return source.slice(openParen + 1, index).trim() === '' ? 0 : count
-    } else if (char === ',' && depth === 1) count++
+      if (depth === 0) {return source.slice(openParen + 1, index).trim() === '' ? 0 : count}
+    } else if (char === ',' && depth === 1) {count++}
   }
   return count
 }

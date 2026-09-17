@@ -20,182 +20,17 @@
  * The ArkUI DSL itself is checked separately by check-arkui.mjs.
  */
 import { check, section, finish, jsonEqual } from './harness'
-import { DesktopPeer } from './desktop-peer'
-import {
-  FakeAssetStore,
-  FakePreferences,
-  SocketLike,
-  installKit
-} from './kit-stub'
-
-import { OrcaConnection } from '../../entry/src/main/ets/services/OrcaConnection.ets'
 import { MOBILE_RUNTIME_CLIENT_CAPABILITIES } from '../../entry/src/main/ets/core/rpc/MobileRuntimeCapabilities.ets'
-import { createPipe, PipeSide } from './desktop-peer'
-import nacl from 'tweetnacl'
-
-const DEVICE_TOKEN = 'device-token-ui'
-const ENDPOINT = 'ws://192.168.1.20:7788'
-const DESKTOP_SECRET = new Uint8Array(32).fill(0x33)
-
-const desktopPublicKeyB64 = Buffer.from(
-  nacl.box.keyPair.fromSecretKey(DESKTOP_SECRET).publicKey
-).toString('base64')
-
-const TERMINALS = [
-  { id: 'term-1', title: 'Shell 1' },
-  { id: 'term-2', title: 'Shell 2' }
-]
-
-function sleep(ms: number): Promise<void> {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms))
-}
-
-async function waitFor(label: string, predicate: () => boolean, timeoutMs = 6000): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    if (predicate()) return true
-    await sleep(5)
-  }
-  console.error(`  … timed out waiting for: ${label}`)
-  return predicate()
-}
-
-/** A pairing code in the shape the desktop's QR would carry. */
-function pairingCode(overrides: Record<string, unknown> = {}): string {
-  const json = JSON.stringify({
-    v: 2,
-    endpoint: ENDPOINT,
-    deviceToken: DEVICE_TOKEN,
-    publicKeyB64: desktopPublicKeyB64,
-    ...overrides
-  })
-  return Buffer.from(json, 'utf8')
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
-}
-
-// ---------------------------------------------------------------------------
-// The installed environment, re-created per scenario
-// ---------------------------------------------------------------------------
-
-interface Environment {
-  connection: OrcaConnection
-  preferences: FakePreferences
-  assetStore: FakeAssetStore
-  peers: DesktopPeer[]
-  dialogs: { title: string; message: string; buttons: string[] }[]
-  toasts: string[]
-  actionMenus: { title: string; buttons: string[] }[]
-  setNextChoice: (index: number) => void
-  setScanResult: (value: string | null) => void
-  latestPeer: () => DesktopPeer | null
-}
-
-function createEnvironment(): Environment {
-  const preferences = new FakePreferences()
-  const assetStore = new FakeAssetStore()
-  const peers: DesktopPeer[] = []
-  const dialogs: { title: string; message: string; buttons: string[] }[] = []
-  const toasts: string[] = []
-  const actionMenus: { title: string; buttons: string[] }[] = []
-  let choice = 0
-  let scanResult: string | null = null
-  let seed = 0x1234
-
-  const random = (length: number): Uint8Array => {
-    const out = new Uint8Array(length)
-    for (let index = 0; index < length; index++) {
-      seed = (seed * 1103515245 + 12345) & 0x7fffffff
-      out[index] = (seed >> 16) & 0xff
-    }
-    return out
-  }
-
-  const openSocket = (_endpoint: string): SocketLike => {
-    const pipe = createPipe()
-    const peer = new DesktopPeer({
-      serverSecret: DESKTOP_SECRET,
-      deviceToken: DEVICE_TOKEN,
-      terminals: TERMINALS
-    })
-    peer.attach(pipe.desktop)
-    peers.push(peer)
-    return socketLikeFor(pipe.client)
-  }
-
-  installKit({
-    openSocket,
-    preferences,
-    assetStore,
-    random,
-    dialogs,
-    toasts,
-    actionMenus,
-    nextChoice: () => choice,
-    scanResult
-  })
-
-  const connection = new OrcaConnection({} as never)
-  return {
-    connection,
-    preferences,
-    assetStore,
-    peers,
-    dialogs,
-    toasts,
-    actionMenus,
-    setNextChoice: (index: number) => {
-      choice = index
-    },
-    setScanResult: (value: string | null) => {
-      scanResult = value
-      installKit({
-        openSocket,
-        preferences,
-        assetStore,
-        random,
-        dialogs,
-        toasts,
-        actionMenus,
-        nextChoice: () => choice,
-        scanResult
-      })
-    },
-    latestPeer: () => (peers.length === 0 ? null : peers[peers.length - 1])
-  }
-}
-
-/** Adapts one end of the pipe to the surface `@kit.NetworkKit`'s stub expects. */
-function socketLikeFor(side: PipeSide): SocketLike {
-  let openHandler: () => void = () => {}
-  let messageHandler: (data: string | ArrayBuffer) => void = () => {}
-  let closeHandler: (code: number) => void = () => {}
-  let errorHandler: (message: string) => void = () => {}
-
-  side.setMessageHandler((data) => messageHandler(data))
-  side.setCloseHandler(() => closeHandler(-1))
-  // A real socket opens asynchronously, after the adapter has subscribed.
-  queueMicrotask(() => openHandler())
-
-  return {
-    onOpen: (handler) => {
-      openHandler = handler
-    },
-    onMessage: (handler) => {
-      messageHandler = handler
-    },
-    onClose: (handler) => {
-      closeHandler = handler
-    },
-    onError: (handler) => {
-      errorHandler = handler
-    },
-    send: (frame) => side.send(frame),
-    close: () => side.close()
-  }
-}
+import { asRecord, asString } from '../../entry/src/main/ets/core/json/JsonValue.ets'
+import { runBufferCapScenario } from './verify-ui-buffer-cap'
+import {
+  DEVICE_TOKEN,
+  ENDPOINT,
+  desktopPublicKeyB64,
+  createEnvironment,
+  pairingCode,
+  waitFor
+} from './ui-state-environment'
 
 /** Scenario driver. A single async body, so the bundle needs no top-level await. */
 async function main(): Promise<void> {
@@ -228,8 +63,8 @@ async function main(): Promise<void> {
   // The whole point of the split: the token must not be in the metadata file.
   const stored = env.preferences.raw().get('hosts.v1') ?? ''
   check('metadata was persisted', stored.length > 0)
-  check('the metadata file does NOT contain the device token', stored.indexOf(DEVICE_TOKEN) === -1)
-  check('the metadata file carries the pinned key', stored.indexOf(desktopPublicKeyB64) !== -1, stored)
+  check('the metadata file does NOT contain the device token', !stored.includes(DEVICE_TOKEN))
+  check('the metadata file carries the pinned key', stored.includes(desktopPublicKeyB64), stored)
 
   const secrets = Array.from(env.assetStore.entries.values())
   check('the credential was written to the secret store', secrets.length === 1, `entries=${secrets.length}`)
@@ -320,7 +155,7 @@ section('UI-3. connect and the state pill')
   )
   check(
     'the log does not leak the device token',
-    env.connection.log().every((row) => row.detail.indexOf(DEVICE_TOKEN) === -1)
+    env.connection.log().every((row) => !row.detail.includes(DEVICE_TOKEN))
   )
   check(
     'the capability advisory was sent on connect',
@@ -407,14 +242,14 @@ section('UI-5. reactivity invariants the list rendering depends on')
   peer?.sendOutput('term-1', 'partial', 20)
   await waitFor('first partial', () => env.connection.terminal().length >= 1)
   const beforeGrow = env.connection.terminal()
-  const lastBefore = beforeGrow[beforeGrow.length - 1]
+  const lastBefore = beforeGrow.at(-1)
 
   peer?.sendOutput('term-1', '-more', 21)
   await waitFor('growth', () =>
     env.connection.terminal().some((line) => line.text.endsWith('-more'))
   )
   const afterGrow = env.connection.terminal()
-  const lastAfter = afterGrow[afterGrow.length - 1]
+  const lastAfter = afterGrow.at(-1)
 
   check('the growing line kept its identity by id', lastBefore.id === lastAfter.id, `${lastBefore.id} → ${lastAfter.id}`)
   check('the growing line is a NEW object, so the row re-renders', lastBefore !== lastAfter)
@@ -430,7 +265,7 @@ section('UI-5. reactivity invariants the list rendering depends on')
 
   // Every rendered key must be unique, or ArkUI reuses the wrong rows.
   const lines = env.connection.terminal()
-  const keys = new Set(lines.map((line, index) => `${line.id}:${line.text.length}`))
+  const keys = new Set(lines.map((line) => `${line.id}:${line.text.length}`))
   check('all terminal row keys are unique', keys.size === lines.length, `${keys.size} keys for ${lines.length} lines`)
   const ids = new Set(lines.map((line) => line.id))
   check('all terminal line ids are unique', ids.size === lines.length)
@@ -462,7 +297,7 @@ section('UI-6. terminal input from the composer')
   )
   check(
     'the input carried the active terminal id',
-    peer !== null && peer.rpcRequests.some((r) => r.method === 'terminal.send' && (r.params as Record<string, Object>)?.terminal === 'term-1')
+    peer !== null && peer.rpcRequests.some((r) => r.method === 'terminal.send' && asString(asRecord(r.params)?.terminal) === 'term-1')
   )
 
   env.connection.disconnect()
@@ -485,7 +320,7 @@ section('UI-7. forgetting a host removes the credential too')
   check('the host disappears from the list', env.connection.hostRows().length === 0)
   check('the credential was removed from the secret store', env.assetStore.entries.size === 0)
   const stored = env.preferences.raw().get('hosts.v1') ?? '[]'
-  check('the metadata no longer lists the host', stored.indexOf('host-') === -1 || stored === '[]', stored)
+  check('the metadata no longer lists the host', !stored.includes('host-') || stored === '[]', stored)
 
   env.connection.disconnect()
 }
@@ -549,7 +384,7 @@ section('UI-8. unreadable state fails closed')
   check('an unreadable credential hides the host', hidden.length === 0, JSON.stringify(hidden))
   check(
     'the host metadata is preserved for a later retry',
-    (broken.preferences.raw().get('hosts.v1') ?? '').indexOf(desktopPublicKeyB64) !== -1
+    (broken.preferences.raw().get('hosts.v1') ?? '').includes(desktopPublicKeyB64)
   )
 
   // (d) A re-pair after a credential wipe must overwrite in place, not duplicate.
@@ -560,41 +395,12 @@ section('UI-8. unreadable state fails closed')
   check('the repair wrote exactly one credential', broken.assetStore.entries.size === 1)
 }
 
-// ---------------------------------------------------------------------------
-// UI-9. The terminal buffer is bounded
-// ---------------------------------------------------------------------------
-
-section('UI-9. terminal buffer cannot grow without limit')
-
-{
-  const env = createEnvironment()
-  await env.connection.initialize()
-  await env.connection.pairFromInput(pairingCode())
-  env.connection.connect(env.connection.hostRows()[0].id)
-  await waitFor('connected', () => env.connection.isConnected())
-  env.connection.openTerminal('term-1', 80, 24)
-  const peer = env.latestPeer()
-  await waitFor('subscribe', () => peer !== null && peer.terminalSubscribeParams.length === 1)
-
-  // 5 000 lines through the real path; the cap is 2 000.
-  const chunk = new Array(500).fill('x').join('\n')
-  for (let index = 0; index < 10; index++) {
-    peer?.sendOutput('term-1', `\n${chunk}`, 100 + index)
-  }
-  await waitFor('the buffer to exceed the cap', () => env.connection.terminal().length >= 2000, 8000)
-
-  const lines = env.connection.terminal()
-  check('the buffer is capped', lines.length <= 2000, `${lines.length} lines`)
-  check('the cap is actually reached (the stream was long enough)', lines.length >= 1900, `${lines.length} lines`)
-  check('line ids keep increasing after trimming (no key reuse)', lines[lines.length - 1].id > lines[0].id)
-
-  env.connection.disconnect()
-}
+  await runBufferCapScenario()
 
   finish('the shipped view-model produces the state the views render.')
 }
 
-main().catch((error: Object) => {
+main().catch((error: object) => {
   console.error(`\nHARNESS ERROR  ${String(error)}`)
   process.exit(1)
 })

@@ -27,77 +27,24 @@ import {
   TerminalStreamOpcode,
   encodeTerminalStreamFrame
 } from '../../../mobile/src/transport/terminal-stream-protocol'
+import type { PipeSide } from './pipe-side'
+import {
+  asRecord,
+  asString,
+  asStringArray,
+  parseJsonRecord
+} from '../../entry/src/main/ets/core/json/JsonValue.ets'
 
 const encoder = new TextEncoder()
 
-/** One end of the simulated link. */
-export class PipeSide {
-  private messageHandler: (data: string | ArrayBuffer) => void = () => {}
-  private closeHandler: () => void = () => {}
-  private other: PipeSide | null = null
-  private open: boolean = true
-  /** Everything this side put on the wire, for "was it sealed?" assertions. */
-  readonly sent: (string | ArrayBuffer)[] = []
-
-  link(peer: PipeSide): void {
-    this.other = peer
-  }
-
-  setMessageHandler(handler: (data: string | ArrayBuffer) => void): void {
-    this.messageHandler = handler
-  }
-
-  setCloseHandler(handler: () => void): void {
-    this.closeHandler = handler
-  }
-
-  isOpen(): boolean {
-    return this.open
-  }
-
-  send(data: string | ArrayBuffer): void {
-    if (!this.open) return
-    this.sent.push(data)
-    const peer = this.other
-    if (peer === null || !peer.open) return
-    // Asynchronous delivery: a real socket never re-enters the sender's stack.
-    queueMicrotask(() => {
-      if (peer.open) peer.messageHandler(data)
-    })
-  }
-
-  /** Simulates the peer going away (network drop, not a graceful close). */
-  drop(): void {
-    this.open = false
-    const peer = this.other
-    if (peer !== null && peer.open) {
-      peer.open = false
-      queueMicrotask(() => peer.closeHandler())
-    }
-    queueMicrotask(() => this.closeHandler())
-  }
-
-  close(): void {
-    this.drop()
-  }
-}
-
-export function createPipe(): { client: PipeSide; desktop: PipeSide } {
-  const client = new PipeSide()
-  const desktop = new PipeSide()
-  client.link(desktop)
-  desktop.link(client)
-  return { client, desktop }
-}
-
-export interface DesktopRequest {
+export type DesktopRequest = {
   id: string
   deviceToken: string
   method: string
-  params?: Object
+  params?: object
 }
 
-export interface DesktopPeerOptions {
+export type DesktopPeerOptions = {
   /** Fixed 32-byte secret so a failing run reproduces. */
   serverSecret: Uint8Array
   deviceToken: string
@@ -129,7 +76,7 @@ export class DesktopPeer {
   dropReason: string = ''
 
   private fail(reason: string): void {
-    if (this.dropReason === '') this.dropReason = reason
+    if (this.dropReason === '') {this.dropReason = reason}
     this.side?.drop()
   }
 
@@ -138,8 +85,8 @@ export class DesktopPeer {
   readonly rpcMethods: string[] = []
   readonly rpcRequests: DesktopRequest[] = []
   readonly capabilityAdvertisements: string[][] = []
-  readonly terminalSubscribeParams: Record<string, Object>[] = []
-  readonly terminalUnsubscribeParams: Record<string, Object>[] = []
+  readonly terminalSubscribeParams: Record<string, object>[] = []
+  readonly terminalUnsubscribeParams: Record<string, object>[] = []
   readonly terminalSendTexts: string[] = []
   readonly authenticateAttempts: { ok: boolean; code: string }[] = []
   readonly outboundTextFrames: string[] = []
@@ -187,7 +134,7 @@ export class DesktopPeer {
       return
     }
     const session = this.session
-    if (session === null) return
+    if (session === null) {return}
     handleDesktopMobileE2EEV2Inbound({
       session,
       raw: typeof data === 'string' ? data : new Uint8Array(data),
@@ -205,21 +152,20 @@ export class DesktopPeer {
   }
 
   private handleHello(raw: string): void {
-    let hello: Object
-    try {
-      hello = JSON.parse(raw) as Object
-    } catch {
+    // parseJsonRecord rejects malformed JSON, arrays and scalars alike, which is
+    // the same set this handshake owes a refusal to.
+    const record = parseJsonRecord(raw)
+    if (record === null) {
       this.fail('hello was not JSON')
       return
     }
     // Only v2 is accepted: the client under test must never fall back to legacy.
-    const record = hello as Record<string, Object>
     if (record.type !== 'e2ee_hello' || record.v !== 2) {
       this.fail(`unexpected hello type/version: ${String(record.type)}/${String(record.v)}`)
       return
     }
     const session = DesktopMobileE2EEV2Session.create({
-      hello,
+      hello: record,
       serverSecretKey: this.options.serverSecret,
       expectedContext: { transport: 'direct' }
     })
@@ -263,7 +209,9 @@ export class DesktopPeer {
   private handleText(plaintext: string): void {
     let request: DesktopRequest
     try {
-      request = JSON.parse(plaintext) as DesktopRequest
+      // JSON.parse is `any`, so the annotation lands the shape the stub needs
+      // without an assertion.
+      request = JSON.parse(plaintext)
     } catch {
       return
     }
@@ -273,9 +221,9 @@ export class DesktopPeer {
     this.rpcMethods.push(request.method)
     this.rpcRequests.push(request)
     if (request.method === 'runtime.clientCapabilities.update') {
-      const params = request.params as Record<string, Object> | undefined
-      const list = params === undefined ? [] : params.clientCapabilities
-      this.capabilityAdvertisements.push(Array.isArray(list) ? (list as string[]) : [])
+      const params = asRecord(request.params)
+      const list = params === null ? null : params.clientCapabilities
+      this.capabilityAdvertisements.push(asStringArray(list) ?? [])
     }
     this.reply(request)
   }
@@ -301,9 +249,9 @@ export class DesktopPeer {
       return
     }
     if (request.method === 'terminal.subscribe') {
-      const params = (request.params ?? {}) as Record<string, Object>
+      const params = asRecord(request.params) ?? {}
       this.terminalSubscribeParams.push(params)
-      const terminal = typeof params.terminal === 'string' ? (params.terminal as string) : ''
+      const terminal = asString(params.terminal) ?? ''
       const streamId = this.nextStreamId++
       this.streamIdByTerminal.set(terminal, streamId)
       this.subscribedStreamIds.push(streamId)
@@ -319,15 +267,15 @@ export class DesktopPeer {
       return
     }
     if (request.method === 'terminal.unsubscribe') {
-      this.terminalUnsubscribeParams.push((request.params ?? {}) as Record<string, Object>)
+      this.terminalUnsubscribeParams.push(asRecord(request.params) ?? {})
       this.sendSealedText(
         JSON.stringify({ id: request.id, ok: true, result: {}, _meta: meta })
       )
       return
     }
     if (request.method === 'terminal.send') {
-      const params = (request.params ?? {}) as Record<string, Object>
-      this.terminalSendTexts.push(typeof params.text === 'string' ? (params.text as string) : '')
+      const params = asRecord(request.params) ?? {}
+      this.terminalSendTexts.push(asString(params.text) ?? '')
       this.sendSealedText(JSON.stringify({ id: request.id, ok: true, result: {}, _meta: meta }))
       return
     }
@@ -346,7 +294,7 @@ export class DesktopPeer {
   /** Pushes a whole-screen snapshot; the client must REPLACE its buffer. */
   sendScrollback(terminal: string, text: string, kind: string = 'scrollback'): boolean {
     const streamId = this.streamIdByTerminal.get(terminal)
-    if (streamId === undefined) return false
+    if (streamId === undefined) {return false}
     const metadata = encoder.encode(JSON.stringify({ kind }))
     this.sendTerminalFrame(streamId, TerminalStreamOpcode.SnapshotStart, metadata, 1)
     this.sendTerminalFrame(streamId, TerminalStreamOpcode.SnapshotChunk, encoder.encode(text), 2)
@@ -357,7 +305,7 @@ export class DesktopPeer {
   /** Pushes incremental output; the client must APPEND it. */
   sendOutput(terminal: string, text: string, seq: number = 10): boolean {
     const streamId = this.streamIdByTerminal.get(terminal)
-    if (streamId === undefined) return false
+    if (streamId === undefined) {return false}
     this.sendTerminalFrame(streamId, TerminalStreamOpcode.Output, encoder.encode(text), seq)
     return true
   }
@@ -370,7 +318,7 @@ export class DesktopPeer {
   ): void {
     const session = this.session
     const side = this.side
-    if (session === null || side === null || this.state !== 'ready') return
+    if (session === null || side === null || this.state !== 'ready') {return}
     const frame = encodeTerminalStreamFrame({ opcode, streamId, seq, payload })
     const sealed = session.sealBinary(frame)
     this.outboundBinaryFrames.push(sealed.byteLength)
@@ -382,7 +330,7 @@ export class DesktopPeer {
   private sendSealedText(plaintext: string): void {
     const session = this.session
     const side = this.side
-    if (session === null || side === null) return
+    if (session === null || side === null) {return}
     const frame = session.sealText(plaintext)
     this.outboundTextFrames.push(frame)
     side.send(frame)

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 
@@ -111,6 +113,8 @@ const CROSS_VERSION_WIRE_PREFIXES = [
   'src/shared/browser-client-host-protocol',
   'src/shared/browser-network-tunnel-protocol',
   'src/shared/browser-client-host-placement',
+  'src/shared/agent-launch-intent',
+  'src/shared/rpc-contract/agent-launch-params',
   'src/shared/agent-session-wire',
   'src/shared/agent-session-mutation-envelope',
   'src/shared/agent-session-journal-',
@@ -119,6 +123,7 @@ const CROSS_VERSION_WIRE_PREFIXES = [
   'src/main/native-chat/agent-session-wire/',
   'src/main/runtime/agent-session-record-store',
   'src/main/runtime/rpc/dispatcher',
+  'src/main/runtime/rpc/methods/agent-launch',
   'src/main/runtime/rpc/methods/ai-vault.ts',
   'src/main/runtime/rpc/methods/browser-tab-create-schema',
   'src/main/runtime/rpc/methods/session-tabs.ts',
@@ -139,6 +144,9 @@ const NATIVE_RUNTIME_PREFIXES = [
   'config/scripts/ensure-native-runtime',
   'config/scripts/rebuild-native-deps',
   'config/scripts/node-pty-job-ownership',
+  'config/scripts/windows-pe-machine',
+  'config/scripts/windows-pe-image-fixture',
+  'config/scripts/script-module-dependencies',
   'config/scripts/windows-process-tree-creation-time',
   'config/scripts/windows-process-tree-gyp-rebuild',
   'config/scripts/electron-builder-native-rebuild',
@@ -215,6 +223,11 @@ const WINDOWS_PACKAGE_TESTS = [
   ...LINUX_PACKAGE_TESTS,
   'config/scripts/rebuild-native-deps.test.mjs',
   'config/scripts/rebuild-native-deps-windows-process-tree.test.mjs',
+  'config/scripts/rebuild-native-deps-node-pty.test.mjs',
+  'config/scripts/ensure-native-runtime-job-ownership.test.mjs',
+  'config/scripts/verify-packaged-node-pty-job-ownership.test.mjs',
+  'config/scripts/windows-pe-machine.test.mjs',
+  'config/scripts/script-module-dependencies.test.mjs',
   'src/main/windows-registry-addon.test.ts',
   'src/main/providers/windows-conpty-wide-char-duplication.node-pty.test.ts',
   'src/main/providers/pty-repaint-wide-char-buffer.node-pty.test.ts',
@@ -223,6 +236,8 @@ const WINDOWS_PACKAGE_TESTS = [
   'src/shared/child-process/windows-cmd-shim-resolution.win32.test.ts',
   'src/main/agent-hooks/windows-hook-payload-delivery.test.ts',
   'src/main/agent-hooks/windows-direct-cmd-hook-command.test.ts',
+  'src/main/codex/windows-hook-command.test.ts',
+  'src/main/codex/windows-hook-upgrade.test.ts',
   'src/main/windows/windows-pty-job.win32.test.ts',
   'src/main/windows/windows-msys-job.win32.test.ts',
   'src/main/windows/windows-host-job.win32.test.ts',
@@ -258,6 +273,49 @@ const DESKTOP_IRRELEVANT_PREFIXES = [
   '.github/workflows/mobile-ios-release.yml',
   '.github/workflows/mobile-android-release.yml'
 ]
+
+const STATIC_ANALYSIS_AUDIT_SCRIPTS = [
+  'audit:code-quality:native',
+  'audit:code-quality:type-aware',
+  'audit:anti-slop'
+]
+
+// Positional arguments of an oxlint invocation are the trees it lints. `--config` consumes the
+// next token; every other flag here is valueless.
+function oxlintScanRoots(command) {
+  const roots = []
+  for (const segment of command.split('&&')) {
+    const tokens = segment.trim().split(/\s+/).filter(Boolean)
+    if (tokens[0] !== 'oxlint') {
+      continue
+    }
+    for (let index = 1; index < tokens.length; index += 1) {
+      if (tokens[index] === '--config') {
+        index += 1
+      } else if (!tokens[index].startsWith('-')) {
+        roots.push(tokens[index])
+      }
+    }
+  }
+  return roots
+}
+
+// Why derived from the commands rather than listed here: `mobile/` is desktop-irrelevant for every
+// other job, yet these audits lint it. A second, hand-maintained copy of "which trees the gate
+// reads" is what let #20702 land violations no PR check ran, so read it off the argv instead.
+function readStaticAnalysisScanRoots() {
+  const manifest = join(import.meta.dirname, '../../package.json')
+  const { scripts = {} } = JSON.parse(readFileSync(manifest, 'utf8'))
+  return [
+    ...new Set(
+      STATIC_ANALYSIS_AUDIT_SCRIPTS.flatMap((name) => oxlintScanRoots(scripts[name] ?? ''))
+    )
+  ]
+}
+
+export const STATIC_ANALYSIS_SCAN_ROOTS = readStaticAnalysisScanRoots()
+
+const STATIC_ANALYSIS_SCAN_PREFIXES = STATIC_ANALYSIS_SCAN_ROOTS.map((root) => `${root}/`)
 
 export function isDocsOnlyPath(file) {
   if (DOCS_ONLY_FILES.has(file)) {
@@ -296,10 +354,15 @@ export function classifyPrJobs(changedFiles) {
       shouldRun && (forceAll || ALWAYS_ON_CODE_JOBS.has(job) || jobDetector(job)(changedFiles))
     ])
   )
+  // Why outside should_run: a mobile-only diff is desktop-irrelevant and skips every job above,
+  // but the repo-wide audits lint mobile/, and skipping them lands the violation on main, where
+  // it then fails this same gate on every later PR's merge ref.
+  jobs.static_analysis = jobs.static_analysis || changedFiles.some(isStaticAnalysisScannedPath)
   return {
     should_run: shouldRun,
     native_cache_changed: shouldRun && (emptyDiff || changedFiles.some(isNativeCacheInputPath)),
-    mobile_dependencies: shouldRun && needsMobileDependencies(changedFiles),
+    mobile_dependencies:
+      (shouldRun || jobs.static_analysis) && needsMobileDependencies(changedFiles),
     ...jobs
   }
 }
@@ -354,6 +417,13 @@ function isTestFile(file) {
 
 function isDesktopIrrelevantPath(file) {
   return matchesPrefix(file, DESKTOP_IRRELEVANT_PREFIXES)
+}
+
+function isStaticAnalysisScannedPath(file) {
+  // Fail closed: roots we failed to parse must keep the gate, not silently drop it.
+  return (
+    STATIC_ANALYSIS_SCAN_PREFIXES.length === 0 || matchesPrefix(file, STATIC_ANALYSIS_SCAN_PREFIXES)
+  )
 }
 
 function isNativeCacheInputPath(file) {

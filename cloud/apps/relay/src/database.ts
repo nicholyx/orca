@@ -10,6 +10,8 @@ import {
   type PostgresPoolPressureCounts
 } from './postgres-pool-pressure.js'
 import { applyPostgresSchema } from './postgres-schema-startup.js'
+import { POSTGRES_STATEMENT_STATS_MIGRATION } from './postgres-statement-stats.js'
+import { reportPostgresQueryFailure } from './postgres-query-failure.js'
 import {
   CellInventoryHoldSamples,
   emptyCellInventoryHoldCounts,
@@ -66,6 +68,17 @@ export interface RelayDatabase {
   close(): Promise<void>
 }
 
+// RULE - no new index and no new column on `relay_control_connection_reservations`,
+// `relay_confirm_results`, `relay_audit_events`, `relay_connection_bases`, or any other large
+// table may be added to SCHEMA or to POSTGRES_SCHEMA_MIGRATIONS. The catalog pre-check skips a
+// lock-taking statement only once the object exists, so a brand-new one reports missing on every
+// director at once and each runs a non-concurrent build over the whole table. POSTGRES_LOCK_TIMEOUT_MS
+// bounds how long that build waits for its lock, not how long it holds it. Build the index out of
+// band with CREATE INDEX CONCURRENTLY first, then add it here, where the pre-check skips it forever
+// after. relay-schema-lock-targets.test.ts pins the current list, so an addition fails CI.
+// Constraint swaps are matched by NAME in pg_constraint, never by body, because the CHECK list is
+// generated from REGION_LIST. Changing a constraint's definition under the same name therefore does
+// nothing on boot: an operator drops it, and the next boot adds the current definition back.
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS relay_invites (
   user_id TEXT NOT NULL,
@@ -619,6 +632,7 @@ CREATE INDEX IF NOT EXISTS relay_audit_events_at ON relay_audit_events(at);
 // auto-named; the replacement is named, so both statements are no-ops on a
 // database the current schema created and neither can drop the other.
 export const POSTGRES_SCHEMA_MIGRATIONS = [
+  POSTGRES_STATEMENT_STATS_MIGRATION,
   `ALTER TABLE relay_region_decisions ADD COLUMN IF NOT EXISTS last_considered_at BIGINT NOT NULL DEFAULT 0`,
   `ALTER TABLE relay_region_decisions ADD COLUMN IF NOT EXISTS cohort_bucket BIGINT NOT NULL DEFAULT 0`,
   `ALTER TABLE relay_region_rehome_attempts
@@ -632,6 +646,14 @@ export const POSTGRES_SCHEMA_MIGRATIONS = [
   `ALTER TABLE relay_control_capabilities ADD COLUMN IF NOT EXISTS idle_regional_rehome BIGINT NOT NULL DEFAULT 0`,
   `ALTER TABLE relay_region_rehome_attempts ADD COLUMN IF NOT EXISTS source_generation BIGINT NOT NULL DEFAULT 0`
 ]
+
+// The exact statement list a Postgres boot applies, in order, so the lock-target census can read
+// what production runs rather than a copy of it. The SQLite path keeps SCHEMA on its own.
+export function relayPostgresSchemaStatements(): string[] {
+  return [...SCHEMA.split(';'), ...POSTGRES_SCHEMA_MIGRATIONS]
+    .map((statement) => statement.trim())
+    .filter((statement) => statement.length > 0)
+}
 
 function postgresSql(sql: string): string {
   let index = 0
@@ -781,6 +803,8 @@ class SqliteDatabase extends SqliteTransaction {
 class PostgresTransaction implements RelayDatabase {
   readonly dialect = 'postgres' as const
   private heldFromMs: number | undefined
+  private lockUnavailable = 0
+  private lockTimeouts = 0
 
   constructor(protected readonly client: pg.PoolClient) {}
 
@@ -789,6 +813,20 @@ class PostgresTransaction implements RelayDatabase {
     const holdMs = performance.now() - this.heldFromMs
     this.heldFromMs = undefined
     return holdMs
+  }
+
+  // Drained by the owning database on both the commit and the rollback path: a
+  // 55P03 rolls the transaction back, so counting only on success would drop it.
+  consumeLockUnavailable(): number {
+    const count = this.lockUnavailable
+    this.lockUnavailable = 0
+    return count
+  }
+
+  consumeLockTimeouts(): number {
+    const count = this.lockTimeouts
+    this.lockTimeouts = 0
+    return count
   }
 
   async query(sql: string, params: unknown[] = []): Promise<SqlRow[]> {
@@ -826,7 +864,13 @@ class PostgresTransaction implements RelayDatabase {
         options.failIfUnavailable &&
         String((error as { code?: unknown }).code) === '55P03'
       ) {
+        if (options.measureHoldMs) this.lockUnavailable += 1
         throw new Error('database_lock_unavailable')
+      }
+      // A bounded wait that expires raises the same 55P03 without NOWAIT. This is
+      // the request path, so it is counted apart from by-design sweep deferrals.
+      if (bounded && options.measureHoldMs && String((error as { code?: unknown }).code) === '55P03') {
+        this.lockTimeouts += 1
       }
       throw error
     } finally {
@@ -908,12 +952,25 @@ class PostgresDatabase implements RelayDatabase {
   }
 
   async query(sql: string, params: unknown[] = []): Promise<SqlRow[]> {
-    const client = await this.pressure.connect()
+    const startedAt = performance.now()
+    let phase: 'acquire' | 'execute' = 'acquire'
+    let client: pg.PoolClient | undefined
     try {
+      client = await this.pressure.connect()
+      phase = 'execute'
       const result = await client.query(postgresSql(sql), params)
       return returnsRows(sql) ? (result.rows as SqlRow[]) : [{ changes: result.rowCount ?? 0 }]
+    } catch (error) {
+      reportPostgresQueryFailure({
+        error,
+        phase,
+        sql,
+        elapsedMs: performance.now() - startedAt,
+        pool: this.pool
+      })
+      throw error
     } finally {
-      client.release()
+      client?.release()
     }
   }
 
@@ -934,6 +991,7 @@ class PostgresDatabase implements RelayDatabase {
         options.failIfUnavailable &&
         String((error as { code?: unknown }).code) === '55P03'
       ) {
+        if (options.measureHoldMs) this.holds.recordUnavailable()
         throw new Error('database_lock_unavailable')
       }
       throw error
@@ -952,9 +1010,13 @@ class PostgresDatabase implements RelayDatabase {
         const result = await operation(transaction)
         await client.query('COMMIT')
         this.holds.record(measuredHoldMs(transaction) ?? Number.NaN)
+        this.holds.recordUnavailable(transaction.consumeLockUnavailable())
+        this.holds.recordLockTimeout(transaction.consumeLockTimeouts())
         return result
       } catch (error) {
         await client.query('ROLLBACK').catch(() => undefined)
+        this.holds.recordUnavailable(transaction.consumeLockUnavailable())
+        this.holds.recordLockTimeout(transaction.consumeLockTimeouts())
         if (!retryablePostgresTransactionError(error) || attempt === POSTGRES_TRANSACTION_ATTEMPTS) {
           if (retryablePostgresTransactionError(error) && options.reportRetries !== false) {
             console.warn(
@@ -1071,11 +1133,14 @@ async function applySchemaOnUntimedPool(
   const database = new PostgresDatabase(pool)
   try {
     await applyPostgresSchema(
-      [
-        ...SCHEMA.split(';').filter((statement) => statement.trim()),
-        ...POSTGRES_SCHEMA_MIGRATIONS
-      ],
-      async (statement) => await database.query(statement)
+      relayPostgresSchemaStatements(),
+      async (statement) => await database.query(statement),
+      // Asks the catalog whether each index or column is already there. CREATE INDEX IF NOT EXISTS
+      // and ALTER TABLE ADD COLUMN IF NOT EXISTS take their relation lock before the server
+      // evaluates the existence test, so on an already-migrated database the boot still joins the
+      // lock queue - and relation locks are granted in queue order, so every writer queues behind
+      // it. The catalog read takes no lock on the table.
+      { catalogQuery: async (sql, params) => await database.query(sql, params) }
     )
   } finally {
     await database.close().catch(() => undefined)

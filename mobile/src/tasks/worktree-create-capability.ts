@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { AGENT_LAUNCH_RUNTIME_CAPABILITY } from '../../../src/shared/protocol-version'
 import type { RpcClient } from '../transport/rpc-client'
 import { isLogicalClientCutoverError } from '../transport/stable-logical-rpc-client'
-import type { RpcSuccess } from '../transport/types'
 import { readMobileRuntimeHostPlatform } from '../transport/mobile-runtime-host-platform'
+import { worktreeCreateCapabilityRead } from './mobile-workspace-create-operations'
 import { MOBILE_TASKS_CAPABILITY } from './mobile-tasks-capability'
 import {
   WORKTREE_CREATE_DEDUPE_TTL_LEGACY_HOST_MS,
@@ -20,12 +21,16 @@ const STATUS_CUTOVER_MAX_RETRIES = 5
 export type NewWorktreeRuntimeCapabilities = {
   tasksSupported: boolean
   worktreeCreateIdempotency: WorktreeCreateIdempotencySupport | false
+  /** Whether the host can route a create through `agent.launch`; an older one only knows
+   *  `worktree.create` + `startupAgent`, which is always a terminal agent. */
+  agentLaunch: boolean
   hostPlatform: NodeJS.Platform | null
 }
 
 const UNSUPPORTED_CAPABILITIES: NewWorktreeRuntimeCapabilities = {
   tasksSupported: false,
   worktreeCreateIdempotency: false,
+  agentLaunch: false,
   hostPlatform: null
 }
 
@@ -36,11 +41,14 @@ export async function readNewWorktreeRuntimeCapabilities(
 ): Promise<NewWorktreeRuntimeCapabilities> {
   for (let migrationRetry = 0; ; migrationRetry += 1) {
     try {
-      const response = await client.sendRequest('status.get')
-      if (!response.ok) {
+      const status = worktreeCreateCapabilityRead.interpret(
+        await worktreeCreateCapabilityRead.request(client)
+      )
+      if (!status.accepted) {
         return UNSUPPORTED_CAPABILITIES
       }
-      const result = (response as RpcSuccess).result as {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Preserve the established response shape at this boundary.
+      const result = status.value as {
         capabilities?: string[]
         worktreeCreateIdempotency?: unknown
       }
@@ -51,6 +59,7 @@ export async function readNewWorktreeRuntimeCapabilities(
       const advertisedIdempotency = result.worktreeCreateIdempotency
       return {
         tasksSupported: capabilities.includes(MOBILE_TASKS_CAPABILITY),
+        agentLaunch: capabilities.includes(AGENT_LAUNCH_RUNTIME_CAPABILITY),
         worktreeCreateIdempotency: supportsIdempotency
           ? advertisedIdempotency === undefined
             ? { dedupeTtlMs: WORKTREE_CREATE_DEDUPE_TTL_LEGACY_HOST_MS }
@@ -79,6 +88,7 @@ export function useNewWorktreeRuntimeCapabilities(
   tasksSupported: boolean
   hostPlatform: NodeJS.Platform | null
   getWorktreeCreateCutoverSupport: () => Promise<WorktreeCreateIdempotencySupport | false>
+  getAgentLaunchSupport: () => Promise<boolean>
 } {
   const [tasksSupported, setTasksSupported] = useState(false)
   const [hostPlatform, setHostPlatform] = useState<NodeJS.Platform | null>(null)
@@ -120,5 +130,9 @@ export function useNewWorktreeRuntimeCapabilities(
     () => getCapabilities().then((capabilities) => capabilities.worktreeCreateIdempotency),
     [getCapabilities]
   )
-  return { tasksSupported, hostPlatform, getWorktreeCreateCutoverSupport }
+  const getAgentLaunchSupport = useCallback(
+    () => getCapabilities().then((capabilities) => capabilities.agentLaunch),
+    [getCapabilities]
+  )
+  return { tasksSupported, hostPlatform, getWorktreeCreateCutoverSupport, getAgentLaunchSupport }
 }

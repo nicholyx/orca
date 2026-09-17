@@ -132,6 +132,18 @@ const Resolution = z.object({
   resolvedAt: z.number().nullable()
 })
 
+const ApprovalMatchedAskRule = z.object({
+  source: z.string(),
+  toolName: z.string(),
+  ruleContent: z.string().optional()
+})
+
+const ApprovalSubject = z.object({
+  kind: z.literal('plan'),
+  text: z.string().min(1),
+  filePath: z.string().optional()
+})
+
 const MessageBody = z.object({
   kind: z.literal('message'),
   role: z.string().min(1),
@@ -154,6 +166,12 @@ export const AgentJournalItemBodySchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('approval'),
     title: z.string(),
+    displayName: z.string().optional(),
+    description: z.string().optional(),
+    decisionReason: z.string().optional(),
+    blockedPath: z.string().optional(),
+    matchedAskRule: ApprovalMatchedAskRule.optional(),
+    subject: ApprovalSubject.optional(),
     detail: z.string().nullable(),
     options: z.array(PromptOption),
     resolution: Resolution
@@ -177,6 +195,7 @@ export const AgentJournalItemBodySchema = z.discriminatedUnion('kind', [
         state: z.string().min(1),
         userItemId: z.string().min(1).optional(),
         startedAt: z.number().finite().positive().optional(),
+        requestedAt: z.number().finite().positive().optional(),
         completedAt: z.number().finite().positive().optional(),
         durationMs: z.number().finite().nonnegative().optional()
       })
@@ -189,6 +208,7 @@ export const AgentJournalItemBodySchema = z.discriminatedUnion('kind', [
     state: z.string().min(1),
     userItemId: z.string().min(1).optional(),
     startedAt: z.number().finite().positive().optional(),
+    requestedAt: z.number().finite().positive().optional(),
     completedAt: z.number().finite().positive().optional(),
     durationMs: z.number().finite().nonnegative().optional()
   })
@@ -242,7 +262,7 @@ export function isAdmissibleAgentJournalSubmission(
  *  never reject a row a writer in this build produced. The schemas are
  *  deliberately wider on open string fields, so only this direction holds. */
 type Admits<T extends true> = T
-export type CanonicalJournalShapesAreAdmissible = [
+export type CanonicalJournalTypesAreAdmissible = [
   Admits<AgentJournalItemBody extends z.input<typeof AgentJournalItemBodySchema> ? true : false>,
   Admits<AgentJournalMessageItem extends z.input<typeof MessageBody> ? true : false>,
   Admits<

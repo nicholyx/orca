@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "baseline": "01a1b6b024f6664c110e9ae50717ef4880fd8d82",
+  "baseline": "e8a7be4ce24a3c4fed44b4488966db6f7596e396",
   "scenarios": [
     {
       "id": "b1",
@@ -1170,6 +1170,118 @@
             "ok": true,
             "result": {
               "platform": "linux"
+            }
+          }
+        },
+        {
+          "checkpoint": "settled"
+        }
+      ]
+    },
+    {
+      "id": "settings-repo-metadata-icons",
+      "operation": "settings.repo-metadata",
+      "version": 1,
+      "family": "settings.repo-metadata",
+      "sites": ["mobile/src/host-screen/use-host-repo-metadata.ts"],
+      "schedules": ["settings-first"],
+      "steps": [
+        {
+          "action": "mount",
+          "id": "mount"
+        },
+        {
+          "action": "load",
+          "id": "load"
+        },
+        {
+          "complete": "repo.list#1",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "repos": [
+                {
+                  "id": "repo-1",
+                  "displayName": "Lucide",
+                  "badgeColor": "#123456",
+                  "repoIcon": {
+                    "type": "lucide",
+                    "name": "Rocket"
+                  },
+                  "connectionId": null
+                },
+                {
+                  "id": "repo-2",
+                  "displayName": "Emoji",
+                  "repoIcon": {
+                    "type": "emoji",
+                    "emoji": "🐳"
+                  },
+                  "connectionId": "ssh-1"
+                },
+                {
+                  "id": "repo-3",
+                  "displayName": "Avatar",
+                  "repoIcon": {
+                    "type": "image",
+                    "src": "https://github.com/acme.png?size=64",
+                    "source": "github",
+                    "label": "acme/orca"
+                  },
+                  "executionHostId": "ssh:ssh-1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "complete": "ssh.listTargetSummaries#1",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "targets": [
+                {
+                  "id": "ssh-1",
+                  "label": "SSH"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "checkpoint": "settings-pending"
+        },
+        {
+          "complete": "settings.get#1",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "settings": {
+                "defaultTuiAgent": "codex",
+                "disabledTuiAgents": [],
+                "hostSettingOverrides": {}
+              }
+            }
+          }
+        },
+        {
+          "complete": "host.platform#1",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "platform": "darwin"
             }
           }
         },
@@ -5821,6 +5933,64 @@
       ]
     },
     {
+      "id": "tw-create-retry-agent-launched",
+      "operation": "tasks.worktree-create-retry",
+      "version": 1,
+      "family": "worktree.agent-launch-create",
+      "sites": [
+        "mobile/src/tasks/worktree-create-retry.ts",
+        "mobile/src/tasks/agent-launch-worktree-create.ts"
+      ],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "create",
+          "id": "create",
+          "args": {
+            "agentLaunch": true
+          }
+        },
+        {
+          "checkpoint": "sent"
+        },
+        {
+          "complete": "agent.launch#1",
+          "params": {
+            "agent": "codex",
+            "target": {
+              "kind": "create-worktree",
+              "create": {
+                "repo": "id:repo-1",
+                "name": "kestrel",
+                "clientMutationId": "mutation-1"
+              }
+            }
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "outcome": {
+                "kind": "structured",
+                "sessionId": "sess-1",
+                "handle": "t-1"
+              },
+              "worktreeId": "repo-1::/w",
+              "warning": "  startup terminal failed  ",
+              "receipt": {
+                "mode": "structured",
+                "preferred": "structured",
+                "reason": "user_default",
+                "detail": "Structured session created."
+              }
+            }
+          }
+        },
+        {
+          "checkpoint": "launched"
+        }
+      ]
+    },
+    {
       "id": "tw-capabilities-advertised",
       "operation": "tasks.worktree-capabilities",
       "version": 1,
@@ -6129,8 +6299,15 @@
             "result": {
               "items": [
                 {
+                  "id": "issue:1",
+                  "type": "issue",
                   "number": 1,
-                  "title": "one"
+                  "title": "one",
+                  "state": "open",
+                  "url": "",
+                  "labels": [],
+                  "updatedAt": "2020-01-01T00:00:00.000Z",
+                  "author": null
                 }
               ]
             }
@@ -6157,8 +6334,15 @@
             "result": {
               "items": [
                 {
-                  "iid": 2,
-                  "title": "two"
+                  "id": "issue:2",
+                  "type": "issue",
+                  "number": 2,
+                  "title": "two",
+                  "state": "opened",
+                  "url": "",
+                  "labels": [],
+                  "updatedAt": "2020-01-01T00:00:00.000Z",
+                  "author": null
                 }
               ],
               "error": {
@@ -6187,7 +6371,24 @@
             "result": {
               "items": [
                 {
-                  "id": "issue-1"
+                  "id": "issue-1",
+                  "identifier": "ENG-1",
+                  "title": "A searched issue",
+                  "url": "",
+                  "state": {
+                    "name": "Todo",
+                    "type": "unstarted",
+                    "color": "#000"
+                  },
+                  "team": {
+                    "id": "team-1",
+                    "key": "ENG",
+                    "name": "Engineering"
+                  },
+                  "labels": [],
+                  "priority": 0,
+                  "updatedAt": "2020-01-01T00:00:00.000Z",
+                  "workspaceId": "linear-workspace"
                 }
               ]
             }
@@ -6238,7 +6439,24 @@
             "ok": true,
             "result": [
               {
-                "id": "issue-3"
+                "id": "issue-3",
+                "identifier": "ENG-3",
+                "title": "An assigned issue",
+                "url": "",
+                "state": {
+                  "name": "In Progress",
+                  "type": "started",
+                  "color": "#111"
+                },
+                "team": {
+                  "id": "team-1",
+                  "key": "ENG",
+                  "name": "Engineering"
+                },
+                "labels": [],
+                "priority": 2,
+                "updatedAt": "2020-01-02T00:00:00.000Z",
+                "workspaceId": "linear-workspace"
               }
             ]
           }
@@ -6277,7 +6495,24 @@
             "ok": true,
             "result": [
               {
-                "id": "issue-2"
+                "id": "issue-2",
+                "identifier": "ENG-2",
+                "title": "An assigned issue",
+                "url": "",
+                "state": {
+                  "name": "Todo",
+                  "type": "unstarted",
+                  "color": "#000"
+                },
+                "team": {
+                  "id": "team-1",
+                  "key": "ENG",
+                  "name": "Engineering"
+                },
+                "labels": [],
+                "priority": 0,
+                "updatedAt": "2020-01-01T00:00:00.000Z",
+                "workspaceId": "linear-workspace"
               }
             ]
           }
@@ -6374,8 +6609,15 @@
           "reply": {
             "ok": true,
             "result": {
+              "id": "issue:12",
+              "type": "issue",
               "number": 12,
-              "title": "twelve"
+              "title": "twelve",
+              "state": "open",
+              "url": "",
+              "labels": [],
+              "updatedAt": "2020-01-01T00:00:00.000Z",
+              "author": null
             }
           }
         },
@@ -6398,8 +6640,15 @@
           "reply": {
             "ok": true,
             "result": {
+              "id": "issue:12",
+              "type": "issue",
               "number": 12,
-              "title": "twelve"
+              "title": "twelve",
+              "state": "open",
+              "url": "",
+              "labels": [],
+              "updatedAt": "2020-01-01T00:00:00.000Z",
+              "author": null
             }
           }
         },
@@ -6422,8 +6671,15 @@
           "reply": {
             "ok": true,
             "result": {
-              "iid": 7,
-              "title": "seven"
+              "id": "issue:7",
+              "type": "issue",
+              "number": 7,
+              "title": "seven",
+              "state": "opened",
+              "url": "",
+              "labels": [],
+              "updatedAt": "2020-01-01T00:00:00.000Z",
+              "author": null
             }
           }
         },
@@ -7848,6 +8104,37 @@
                 }
               ]
             }
+          }
+        },
+        {
+          "checkpoint": "settled"
+        }
+      ]
+    },
+    {
+      "id": "worktree-catalog-snapshot-unreadable",
+      "operation": "worktree.catalog-snapshot",
+      "version": 1,
+      "family": "worktree.catalog-snapshot",
+      "sites": ["mobile/src/worktree/worktree-catalog-snapshot-client.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "fetch",
+          "id": "fetch"
+        },
+        {
+          "checkpoint": "catalog-pending"
+        },
+        {
+          "complete": "worktree.ps#1",
+          "params": {
+            "limit": 10000,
+            "supportsWorktreeVisibilitySourceDefaults": true,
+            "afterSnapshotId": null
+          },
+          "reply": {
+            "ok": true
           }
         },
         {
@@ -13865,6 +14152,55 @@
       ]
     },
     {
+      "id": "speech-setup-sheet-model-vocabulary",
+      "operation": "speech.setup-sheet",
+      "version": 1,
+      "family": "speech.setup-sheet",
+      "sites": ["mobile/src/dictation/mobile-dictation-setup.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "list",
+          "id": "list"
+        },
+        {
+          "complete": "speech.models.list#1",
+          "params": null,
+          "reply": {
+            "ok": true,
+            "result": {
+              "enabled": true,
+              "selectedModelId": "gpt-4o-transcribe",
+              "dictationMode": "hold",
+              "models": [
+                {
+                  "id": "whisper-small",
+                  "label": "Small",
+                  "provider": "local",
+                  "status": "downloading",
+                  "sizeBytes": 466862080,
+                  "progress": 0.42,
+                  "recommended": true
+                },
+                {
+                  "id": "gpt-4o-transcribe",
+                  "label": "OpenAI",
+                  "provider": "openai",
+                  "status": "ready",
+                  "sizeBytes": null,
+                  "progress": null,
+                  "recommended": false
+                }
+              ]
+            }
+          }
+        },
+        {
+          "checkpoint": "settled"
+        }
+      ]
+    },
+    {
       "id": "speech-setup-sheet-legacy-desktop",
       "operation": "speech.setup-sheet",
       "version": 1,
@@ -15612,7 +15948,7 @@
           "complete": "terminal.send#1",
           "params": {
             "terminal": "terminal-1",
-            "text": "\u001b[200~/tmp/img.png\u001b[201~ ",
+            "text": "\u001b[200~@/tmp/img.png\u001b[201~ ",
             "enter": false,
             "client": {
               "id": "device-token-1",
@@ -15766,7 +16102,7 @@
           "complete": "terminal.send#1",
           "params": {
             "terminal": "terminal-1",
-            "text": "\u001b[200~/tmp/img.png\u001b[201~ ",
+            "text": "\u001b[200~@/tmp/img.png\u001b[201~ ",
             "enter": false
           },
           "reply": {
@@ -15819,7 +16155,7 @@
           "complete": "terminal.send#2",
           "params": {
             "terminal": "terminal-1",
-            "text": "\u001b[200~/tmp/a.png\u001b[201~ ",
+            "text": "\u001b[200~@/tmp/a.png\u001b[201~ ",
             "enter": false,
             "client": {
               "id": "device-token-1",
@@ -15876,7 +16212,7 @@
           "complete": "terminal.send#2",
           "params": {
             "terminal": "terminal-1",
-            "text": "\u001b[200~/tmp/a.png\u001b[201~",
+            "text": "\u001b[200~@/tmp/a.png\u001b[201~ ",
             "enter": false,
             "client": {
               "id": "device-token-1",
@@ -15896,7 +16232,7 @@
           "complete": "terminal.send#3",
           "params": {
             "terminal": "terminal-1",
-            "text": "\u001b[200~/tmp/b.png\u001b[201~ ",
+            "text": "\u001b[200~@/tmp/b.png\u001b[201~ ",
             "enter": false,
             "client": {
               "id": "device-token-1",
@@ -15953,7 +16289,7 @@
           "complete": "terminal.send#2",
           "params": {
             "terminal": "terminal-1",
-            "text": "\u001b[200~/tmp/a.png\u001b[201~",
+            "text": "\u001b[200~@/tmp/a.png\u001b[201~ ",
             "enter": false,
             "client": {
               "id": "device-token-1",
@@ -16010,7 +16346,7 @@
           "complete": "terminal.send#2",
           "params": {
             "terminal": "terminal-1",
-            "text": "\u001b[200~/tmp/a.png\u001b[201~",
+            "text": "\u001b[200~@/tmp/a.png\u001b[201~",
             "enter": false,
             "client": {
               "id": "device-token-1",
@@ -19754,6 +20090,129 @@
       ]
     },
     {
+      "id": "notifications-display-test-not-registered",
+      "operation": "notifications.display-test-screen",
+      "version": 1,
+      "family": "notifications.display-test-screen",
+      "sites": ["mobile/src/settings/notification-display-test.tsx"],
+      "schedules": [],
+      "deviceStore": {
+        "orca:hosts": "[{\"id\":\"host-1\",\"name\":\"Desk\",\"endpoint\":\"ws://desk.local:7777\",\"publicKeyB64\":\"AAAA\",\"lastConnected\":1700000000000}]"
+      },
+      "steps": [
+        {
+          "action": "mount",
+          "id": "mount"
+        },
+        {
+          "checkpoint": "mounted"
+        },
+        {
+          "action": "send-test",
+          "id": "press"
+        },
+        {
+          "checkpoint": "sending"
+        },
+        {
+          "complete": "notifications.testPush#1",
+          "params": null,
+          "reply": {
+            "ok": true,
+            "result": {
+              "accepted": false,
+              "reason": "not_registered"
+            }
+          }
+        },
+        {
+          "checkpoint": "not-registered"
+        }
+      ]
+    },
+    {
+      "id": "notifications-display-test-rate-limited",
+      "operation": "notifications.display-test-screen",
+      "version": 1,
+      "family": "notifications.display-test-screen",
+      "sites": ["mobile/src/settings/notification-display-test.tsx"],
+      "schedules": [],
+      "deviceStore": {
+        "orca:hosts": "[{\"id\":\"host-1\",\"name\":\"Desk\",\"endpoint\":\"ws://desk.local:7777\",\"publicKeyB64\":\"AAAA\",\"lastConnected\":1700000000000}]"
+      },
+      "steps": [
+        {
+          "action": "mount",
+          "id": "mount"
+        },
+        {
+          "checkpoint": "mounted"
+        },
+        {
+          "action": "send-test",
+          "id": "press"
+        },
+        {
+          "checkpoint": "sending"
+        },
+        {
+          "complete": "notifications.testPush#1",
+          "params": null,
+          "reply": {
+            "ok": true,
+            "result": {
+              "accepted": false,
+              "reason": "rate_limited"
+            }
+          }
+        },
+        {
+          "checkpoint": "rate-limited"
+        }
+      ]
+    },
+    {
+      "id": "notifications-display-test-unknown-reason",
+      "operation": "notifications.display-test-screen",
+      "version": 1,
+      "family": "notifications.display-test-screen",
+      "sites": ["mobile/src/settings/notification-display-test.tsx"],
+      "schedules": [],
+      "deviceStore": {
+        "orca:hosts": "[{\"id\":\"host-1\",\"name\":\"Desk\",\"endpoint\":\"ws://desk.local:7777\",\"publicKeyB64\":\"AAAA\",\"lastConnected\":1700000000000}]"
+      },
+      "steps": [
+        {
+          "action": "mount",
+          "id": "mount"
+        },
+        {
+          "checkpoint": "mounted"
+        },
+        {
+          "action": "send-test",
+          "id": "press"
+        },
+        {
+          "checkpoint": "sending"
+        },
+        {
+          "complete": "notifications.testPush#1",
+          "params": null,
+          "reply": {
+            "ok": true,
+            "result": {
+              "accepted": false,
+              "reason": "quota_exceeded"
+            }
+          }
+        },
+        {
+          "checkpoint": "unknown-reason"
+        }
+      ]
+    },
+    {
       "id": "aivault-history-screen-worktrees",
       "operation": "aiVault.history-screen",
       "version": 1,
@@ -22635,6 +23094,517 @@
         },
         {
           "checkpoint": "settled"
+        }
+      ]
+    },
+    {
+      "id": "files-preview-worktree-text-read",
+      "operation": "files.preview-load",
+      "version": 1,
+      "family": "files.preview-worktree-text",
+      "sites": ["mobile/src/files/mobile-file-preview-request.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "worktree",
+          "id": "load"
+        },
+        {
+          "complete": "files.read#1",
+          "params": {
+            "worktree": "id:workspace-1",
+            "relativePath": "docs/readme.md"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "content": "# readme",
+              "truncated": false,
+              "byteLength": 8
+            }
+          }
+        },
+        {
+          "checkpoint": "settled"
+        }
+      ]
+    },
+    {
+      "id": "files-preview-worktree-image-read",
+      "operation": "files.preview-load",
+      "version": 1,
+      "family": "files.preview-worktree-image",
+      "sites": ["mobile/src/files/mobile-file-preview-request.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "worktree",
+          "id": "load",
+          "args": {
+            "path": "docs/logo.png"
+          }
+        },
+        {
+          "complete": "files.readPreview#1",
+          "params": {
+            "worktree": "id:workspace-1",
+            "relativePath": "docs/logo.png"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "content": "aGk=",
+              "isBinary": true,
+              "isImage": true,
+              "mimeType": "image/png"
+            }
+          }
+        },
+        {
+          "checkpoint": "settled"
+        }
+      ]
+    },
+    {
+      "id": "files-preview-artifact-image-read",
+      "operation": "files.preview-load",
+      "version": 1,
+      "family": "files.preview-artifact-image",
+      "sites": ["mobile/src/files/mobile-file-preview-request.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "artifact",
+          "id": "load",
+          "args": {
+            "path": "/logs/shot.png"
+          }
+        },
+        {
+          "complete": "files.readTerminalArtifactPreview#1",
+          "params": {
+            "worktree": "id:workspace-1",
+            "absolutePath": "/logs/shot.png",
+            "grantId": "grant-1"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "content": "aGk=",
+              "isBinary": true,
+              "isImage": true,
+              "mimeType": "image/png"
+            }
+          }
+        },
+        {
+          "checkpoint": "settled"
+        }
+      ]
+    },
+    {
+      "id": "session-markdown-disk-read",
+      "operation": "session.tab-documents",
+      "version": 1,
+      "family": "session.markdown-disk-fallback",
+      "sites": ["mobile/src/session/use-mobile-session-document-readers.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "markdown",
+          "id": "markdown"
+        },
+        {
+          "complete": "markdown.readTab#1",
+          "params": {
+            "tabId": "tab-md",
+            "worktree": "id:workspace-1"
+          },
+          "reply": {
+            "ok": false,
+            "error": {
+              "code": "renderer_unavailable",
+              "message": "Renderer unavailable"
+            }
+          }
+        },
+        {
+          "complete": "files.read#1",
+          "params": {
+            "relativePath": "docs/readme.md",
+            "worktree": "id:workspace-1"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "content": "# disk",
+              "truncated": false,
+              "byteLength": 6
+            }
+          }
+        },
+        {
+          "checkpoint": "fell-back"
+        }
+      ]
+    },
+    {
+      "id": "session-markdown-disk-served",
+      "operation": "session.tab-documents",
+      "version": 1,
+      "family": "session.markdown-disk-fallback",
+      "sites": ["mobile/src/session/use-mobile-session-document-readers.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "markdown",
+          "id": "markdown"
+        },
+        {
+          "complete": "markdown.readTab#1",
+          "params": {
+            "tabId": "tab-md",
+            "worktree": "id:workspace-1"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "content": "# served",
+              "version": "v1",
+              "isDirty": false,
+              "editable": true
+            }
+          }
+        },
+        {
+          "checkpoint": "served"
+        }
+      ]
+    },
+    {
+      "id": "mobile-web-bundle-manifest-read",
+      "operation": "mobileWeb.bundle-manifest",
+      "version": 1,
+      "family": "mobileWeb.bundle-manifest",
+      "sites": ["mobile/src/transport/mobile-web-bundle-operations.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "read",
+          "id": "read"
+        },
+        {
+          "complete": "mobileWeb.bundle.manifest#1",
+          "params": null,
+          "reply": {
+            "ok": true,
+            "result": {
+              "manifest": {
+                "schemaVersion": 1,
+                "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+                "desktopVersion": "1.4.201",
+                "minCompatibleRuntimeProtocolVersion": 2,
+                "runtimeProtocolVersion": 2,
+                "entrypoint": "index.html",
+                "totalBytes": 37,
+                "assets": [
+                  {
+                    "path": "assets/app.js",
+                    "sha256": "e99170780c392398db81fbb3dcaebc1a2c8264d4d8a9cd5932887e9c7206dc3d",
+                    "byteLength": 11,
+                    "contentType": "text/javascript; charset=utf-8"
+                  },
+                  {
+                    "path": "index.html",
+                    "sha256": "483f915496f213c851665840f49b69e05b7a6bf70ec9d6939a831b15d298f31e",
+                    "byteLength": 26,
+                    "contentType": "text/html; charset=utf-8"
+                  }
+                ]
+              },
+              "chunkBytes": 16
+            }
+          }
+        },
+        {
+          "checkpoint": "manifest-read"
+        }
+      ]
+    },
+    {
+      "id": "mobile-web-bundle-fetch-paged",
+      "operation": "mobileWeb.bundle-fetch",
+      "version": 1,
+      "family": "mobileWeb.bundle-fetch",
+      "sites": [
+        "mobile/src/transport/mobile-web-bundle-fetch.ts",
+        "mobile/src/diagnostics/use-mobile-web-bundle-probe.ts"
+      ],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "fetch",
+          "id": "fetch"
+        },
+        {
+          "complete": "mobileWeb.bundle.manifest#1",
+          "params": null,
+          "reply": {
+            "ok": true,
+            "result": {
+              "manifest": {
+                "schemaVersion": 1,
+                "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+                "desktopVersion": "1.4.201",
+                "minCompatibleRuntimeProtocolVersion": 2,
+                "runtimeProtocolVersion": 2,
+                "entrypoint": "index.html",
+                "totalBytes": 37,
+                "assets": [
+                  {
+                    "path": "assets/app.js",
+                    "sha256": "e99170780c392398db81fbb3dcaebc1a2c8264d4d8a9cd5932887e9c7206dc3d",
+                    "byteLength": 11,
+                    "contentType": "text/javascript; charset=utf-8"
+                  },
+                  {
+                    "path": "index.html",
+                    "sha256": "483f915496f213c851665840f49b69e05b7a6bf70ec9d6939a831b15d298f31e",
+                    "byteLength": 26,
+                    "contentType": "text/html; charset=utf-8"
+                  }
+                ]
+              },
+              "chunkBytes": 16
+            }
+          }
+        },
+        {
+          "bind": "app-js",
+          "request": "mobileWeb.bundle.chunk#1",
+          "params": {
+            "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+            "path": "assets/app.js",
+            "offset": 0
+          }
+        },
+        {
+          "bind": "index-head",
+          "request": "mobileWeb.bundle.chunk#2",
+          "params": {
+            "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+            "path": "index.html",
+            "offset": 0
+          }
+        },
+        {
+          "complete": "app-js",
+          "params": {
+            "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+            "path": "assets/app.js",
+            "offset": 0
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+              "path": "assets/app.js",
+              "offset": 0,
+              "assetByteLength": 11,
+              "sha256": "e99170780c392398db81fbb3dcaebc1a2c8264d4d8a9cd5932887e9c7206dc3d",
+              "dataBase64": "b3JjYS5ib290KCk=",
+              "eof": true
+            }
+          }
+        },
+        {
+          "complete": "index-head",
+          "params": {
+            "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+            "path": "index.html",
+            "offset": 0
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+              "path": "index.html",
+              "offset": 0,
+              "assetByteLength": 26,
+              "sha256": "483f915496f213c851665840f49b69e05b7a6bf70ec9d6939a831b15d298f31e",
+              "dataBase64": "PCFkb2N0eXBlIGh0bWw+PA==",
+              "eof": false
+            }
+          }
+        },
+        {
+          "bind": "index-tail",
+          "request": "mobileWeb.bundle.chunk#3",
+          "params": {
+            "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+            "path": "index.html",
+            "offset": 16
+          }
+        },
+        {
+          "complete": "index-tail",
+          "params": {
+            "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+            "path": "index.html",
+            "offset": 16
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+              "path": "index.html",
+              "offset": 16,
+              "assetByteLength": 26,
+              "sha256": "483f915496f213c851665840f49b69e05b7a6bf70ec9d6939a831b15d298f31e",
+              "dataBase64": "cD5vcmNhPC9wPg==",
+              "eof": true
+            }
+          }
+        },
+        {
+          "checkpoint": "bundle-fetched"
+        }
+      ]
+    },
+    {
+      "id": "mobile-web-bundle-unavailable",
+      "operation": "mobileWeb.bundle-fetch",
+      "version": 1,
+      "family": "mobileWeb.bundle-fetch",
+      "sites": [
+        "mobile/src/transport/mobile-web-bundle-fetch.ts",
+        "mobile/src/diagnostics/use-mobile-web-bundle-probe.ts"
+      ],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "fetch",
+          "id": "fetch"
+        },
+        {
+          "complete": "mobileWeb.bundle.manifest#1",
+          "params": null,
+          "reply": {
+            "ok": false,
+            "error": {
+              "code": "invalid_argument",
+              "message": "mobile_web_bundle_unavailable"
+            }
+          }
+        },
+        {
+          "checkpoint": "bundle-unavailable"
+        }
+      ]
+    },
+    {
+      "id": "mobile-web-bundle-build-changed",
+      "operation": "mobileWeb.bundle-fetch",
+      "version": 1,
+      "family": "mobileWeb.bundle-fetch",
+      "sites": [
+        "mobile/src/transport/mobile-web-bundle-fetch.ts",
+        "mobile/src/diagnostics/use-mobile-web-bundle-probe.ts"
+      ],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "fetch",
+          "id": "fetch"
+        },
+        {
+          "complete": "mobileWeb.bundle.manifest#1",
+          "params": null,
+          "reply": {
+            "ok": true,
+            "result": {
+              "manifest": {
+                "schemaVersion": 1,
+                "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+                "desktopVersion": "1.4.201",
+                "minCompatibleRuntimeProtocolVersion": 2,
+                "runtimeProtocolVersion": 2,
+                "entrypoint": "index.html",
+                "totalBytes": 37,
+                "assets": [
+                  {
+                    "path": "assets/app.js",
+                    "sha256": "e99170780c392398db81fbb3dcaebc1a2c8264d4d8a9cd5932887e9c7206dc3d",
+                    "byteLength": 11,
+                    "contentType": "text/javascript; charset=utf-8"
+                  },
+                  {
+                    "path": "index.html",
+                    "sha256": "483f915496f213c851665840f49b69e05b7a6bf70ec9d6939a831b15d298f31e",
+                    "byteLength": 26,
+                    "contentType": "text/html; charset=utf-8"
+                  }
+                ]
+              },
+              "chunkBytes": 16
+            }
+          }
+        },
+        {
+          "bind": "app-js",
+          "request": "mobileWeb.bundle.chunk#1",
+          "params": {
+            "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+            "path": "assets/app.js",
+            "offset": 0
+          }
+        },
+        {
+          "bind": "index-head",
+          "request": "mobileWeb.bundle.chunk#2",
+          "params": {
+            "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+            "path": "index.html",
+            "offset": 0
+          }
+        },
+        {
+          "complete": "app-js",
+          "params": {
+            "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+            "path": "assets/app.js",
+            "offset": 0
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+              "path": "assets/app.js",
+              "offset": 0,
+              "assetByteLength": 11,
+              "sha256": "e99170780c392398db81fbb3dcaebc1a2c8264d4d8a9cd5932887e9c7206dc3d",
+              "dataBase64": "b3JjYS5ib290KCk=",
+              "eof": true
+            }
+          }
+        },
+        {
+          "complete": "index-head",
+          "params": {
+            "buildId": "973c008f6baf56072d8d3d41f451e005257b59026401473543ce96e81c5aa177",
+            "path": "index.html",
+            "offset": 0
+          },
+          "reply": {
+            "ok": false,
+            "error": {
+              "code": "invalid_argument",
+              "message": "mobile_web_bundle_build_changed"
+            }
+          }
+        },
+        {
+          "checkpoint": "bundle-build-changed"
         }
       ]
     }

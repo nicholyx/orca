@@ -46,7 +46,8 @@ const KNOWN_BLOCK_TYPES = new Set([
   'tool-call',
   'tool-result',
   'image-ref',
-  'subagent-group'
+  'subagent-group',
+  'background-task'
 ])
 
 /** Provider IDs are opaque; reject all-whitespace values without rewriting valid IDs. */
@@ -101,6 +102,23 @@ const Block = z.union([
       type: z.literal('subagent-group'),
       groupId: z.string(),
       agents: z.array(SubagentEntry)
+    }),
+    // `kind` and `state` stay open strings for the same reason a child's
+    // lifecycle does: a vocabulary a newer build writes must not turn the row
+    // malformed. The renderer falls back on anything it cannot name.
+    z.object({
+      type: z.literal('background-task'),
+      taskId: z.string().min(1),
+      kind: z.string().min(1),
+      label: z.string(),
+      state: z.string().min(1),
+      parentToolUseId: z.string().optional(),
+      summary: z.string().optional(),
+      error: z.string().optional(),
+      outputFile: z.string().optional(),
+      tokens: z.number().optional(),
+      startedAt: z.number().optional(),
+      settledAt: z.number().optional()
     })
   ]),
   z.object({ type: z.string() }).refine((block) => !KNOWN_BLOCK_TYPES.has(block.type))
@@ -193,6 +211,7 @@ export const AgentJournalItemBodySchema = z.discriminatedUnion('kind', [
       .object({
         turnId: z.string(),
         state: z.string().min(1),
+        outcome: z.string().min(1).optional(),
         userItemId: z.string().min(1).optional(),
         startedAt: z.number().finite().positive().optional(),
         requestedAt: z.number().finite().positive().optional(),
@@ -206,6 +225,10 @@ export const AgentJournalItemBodySchema = z.discriminatedUnion('kind', [
     kind: z.literal('turn'),
     turnId: z.string(),
     state: z.string().min(1),
+    // Open like `state`: a verdict a newer build writes must not turn the row
+    // malformed. `readAgentJournalTurnOutcome` is where an unplaceable one
+    // becomes unknown rather than an arm a caller would act on.
+    outcome: z.string().min(1).optional(),
     userItemId: z.string().min(1).optional(),
     startedAt: z.number().finite().positive().optional(),
     requestedAt: z.number().finite().positive().optional(),

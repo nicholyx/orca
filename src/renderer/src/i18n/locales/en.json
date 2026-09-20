@@ -2,8 +2,8 @@
   "sidebar": {
     "revealFiltered": {
       "title": "Reveal hidden workspace?",
-      "description": "The active workspace is hidden in the sidebar. Revealing it will clear your sidebar filters.",
-      "confirm": "Clear filters and reveal",
+      "description": "The active workspace is hidden in the sidebar. Revealing it will adjust only the filters hiding it.",
+      "confirm": "Adjust filters and reveal",
       "cancel": "Keep filters"
     }
   },
@@ -118,6 +118,9 @@
     "richMarkdown": {
       "tooLarge": "File is larger than the {{limit}} rich editing limit. Showing source mode instead.",
       "openAnyway": "Open anyway"
+    },
+    "fileLoad": {
+      "hostUnresolved": "The host couldn't find this file's workspace. It may have been removed, or the host may not know about it yet. Retry, or close this tab from the tab strip."
     }
   },
   "githubChecks": {
@@ -604,7 +607,8 @@
           "da41abbdd4": "Ante",
           "060d152fb5": "Trae",
           "d443a47995": "Prime Agent",
-          "mimo_code_label": "MiMo Code"
+          "mimo_code_label": "MiMo Code",
+          "opencode2_label": "OpenCode 2"
         },
         "skill": {
           "cli": {
@@ -1678,13 +1682,14 @@
         "326a578923": "orca.yaml + local",
         "2132b670da": "both",
         "0e587e31fb": "yaml",
-        "ac3748dcda": "Name or 'Create From'",
+        "ac3748dcda": "Create From",
         "f660aa1454": "Connecting",
         "7711ad5122": "Local setup command",
         "e5db1b0419": "Combined setup command",
         "runOn": "Run on",
         "addProjectBeforeWorkspace": "Add a project before creating a workspace.",
         "connectProjectFirst": "Connect this project first",
+        "defaultBranchUpdateFailed": "Could not update the project default branch. Try again.",
         "connectSourceLookup": "Connect",
         "reconnectSourceLookup": "Reconnect",
         "setupHostExistingFolderTitle": "Set up {{value0}}",
@@ -1941,6 +1946,46 @@
       },
       "SelectedTextCopyMenu": {
         "9b40d7b018": "Copy"
+      },
+      "NativeChatResumeOnRestartModal": {
+        "title": "Reconnect interrupted chats?",
+        "body": "These chats were mid-turn when Orca closed. Reconnecting restores each one where it stopped, with its full context and without re-sending your prompt — the interrupted reply will not continue on its own.",
+        "updateBody": "These chats were mid-turn when Orca installed an update. Reconnecting restores each one where it stopped, with its full context and without re-sending your prompt — the interrupted reply will not continue on its own.",
+        "terminalSessionsUnaffected": "Only chats are affected — your terminal sessions kept running and need nothing from you.",
+        "resume": "Reconnect",
+        "reconnectAgent": "Reconnect {{value0}} chat",
+        "resumeAll": "Reconnect all",
+        "resuming": "Reconnecting…",
+        "notNow": "Not now",
+        "untitled": "Untitled chat",
+        "listLabel": "Chats that would be reconnected",
+        "notNowHint": "Not now keeps everything — you can reopen any chat later and carry on from the same point.",
+        "dontAskAgain": "Don't ask again — reconnect automatically next time",
+        "dontAskAgainHint": "Qualifying chats will be reconnected automatically after a restart, and Orca will tell you when it happens. You can turn this off in Settings → Experimental → Chat UI.",
+        "resumedOne": "Reconnected 1 chat",
+        "resumedMany": "Reconnected {{value0}} chats",
+        "oneAgent": "1 agent",
+        "manyAgents": "{{value0}} agents",
+        "reconnectAndContinue": "Reconnect and continue",
+        "continuedOne": "Reconnected 1 chat and asked it to continue",
+        "continuedMany": "Reconnected {{value0}} chats and asked them to continue",
+        "whatIsSentTitle": "What Orca sends",
+        "whatIsSentBody": "Continuing sends one short message to each agent, telling it that Orca restarted and asking it to check its last action before carrying on. Your own prompt is never re-sent.",
+        "selectAgent": "Reconnect {{value0}} chat \"{{value1}}\" in {{value2}}",
+        "projects": "Folder workspaces",
+        "resumeSelected": "Reconnect {{value0}}",
+        "continueUnconfirmed": "Continuation delivery is unconfirmed for {{value0}} chats. Open them to check before sending another message.",
+        "continueUnconfirmed_one": "Continuation delivery is unconfirmed for {{value0}} chat. Open it to check before sending another message.",
+        "continueUnconfirmed_other": "Continuation delivery is unconfirmed for {{value0}} chats. Open them to check before sending another message.",
+        "reconnectUnconfirmed": "Reconnection is unconfirmed for {{value0}} chats. You can still open them normally.",
+        "reconnectUnconfirmed_one": "Reconnection is unconfirmed for {{value0}} chat. You can still open it normally.",
+        "reconnectUnconfirmed_other": "Reconnection is unconfirmed for {{value0}} chats. You can still open them normally.",
+        "continueRefused": "{{value0}} chats could not be continued. Open them to continue manually.",
+        "continueRefused_one": "{{value0}} chat could not be continued. Open it to continue manually.",
+        "continueRefused_other": "{{value0}} chats could not be continued. Open them to continue manually.",
+        "reconnectRefused": "{{value0}} chats could not be reconnected. You can still open them normally.",
+        "reconnectRefused_one": "{{value0}} chat could not be reconnected. You can still open it normally.",
+        "reconnectRefused_other": "{{value0}} chats could not be reconnected. You can still open them normally."
       },
       "StarNagCard": {
         "92b0f9d921": "is authenticated and try again.",
@@ -3102,6 +3147,7 @@
         },
         "pane": {
           "CloseTerminalDialog": {
+            "automatic_resume_warning": "This terminal will not resume automatically. Cancel and put the workspace to sleep to resume it later.",
             "ebd2fa844d": "Close",
             "1d1a7a9c1f": "Cancel",
             "6b9a6975f8": "The terminal still has a running process. If you close the terminal, the process will be killed.",
@@ -6077,7 +6123,8 @@
           "setParentFor": "Set parent for"
         },
         "WorktreeCardStatusSlot": {
-          "branchIdentity": "Branch"
+          "branchIdentity": "Branch",
+          "sleeping": "Sleeping"
         },
         "NewExternalWorktreesInboxLine": {
           "9f2d4c8b17": "Hide external worktrees permanently for {{value0}}",
@@ -6316,7 +6363,12 @@
         "RepoScanUnavailableIndicator": {
           "title": "Worktree scan failed for {{value0}}",
           "retry": "Retry scan",
-          "retained": "Existing worktrees are kept until a scan succeeds. Click to retry."
+          "retained": "Existing worktrees are kept until a scan succeeds. Click to retry.",
+          "xcodeLicense": "Apple developer tools require license acceptance before Git can run.",
+          "developerTools": "Apple command-line developer tools are missing or unavailable.",
+          "architectureMismatch": "A Git-related executable could not run because its CPU architecture is incompatible with this execution host. Install Git and related tools for the host architecture.",
+          "copyCommand": "Copy command",
+          "copyDiagnostics": "Copy diagnostics"
         }
       },
       "shared": {
@@ -6505,6 +6557,11 @@
           "codexConfigSyncBlankSource": "Codex is still using the settings it last synced because {{value0}} is empty. That is expected while a synced folder finishes downloading.",
           "codexConfigSyncManagedHomeUnavailable": "Orca could not read this account’s Codex files just now, so settings may not be syncing. This usually clears on its own — antivirus or a backup tool briefly locks them.",
           "codexConfigSyncUnreadableSource": "Codex is still using the settings it last synced because {{value0}} could not be read. Check that file's permissions.",
+          "codexLoginLinkPending": "Codex opened this sign-in link in your browser. Copy it to finish signing in somewhere else — a private window, or another profile.",
+          "codexLoginLinkCopied": "Copied",
+          "codexLoginLinkCopy": "Copy link",
+          "codexLoginLinkOpen": "Open",
+          "codexLoginLinkCopyFailed": "Could not copy the link.",
           "d6f1b9b6a2": "MiniMax API key is required.",
           "7c5d8a4e1b": "MiniMax API key was not saved.",
           "4d2c7b9e83": "MiniMax API key saved.",
@@ -7073,7 +7130,10 @@
             "structuredTitle": "Use updated structured native chat",
             "structuredCopy": "Opt in to the host-owned structured chat runtime for Codex and Claude. Off keeps the existing terminal-backed chat path.",
             "structuredScope": "Local sessions only for now. WSL and remote execution hosts (including SSH) continue to use terminal chat, and Windows falls back to it unless Orca can read process start times.",
-            "structuredToggleLabel": "Toggle updated structured native chat"
+            "structuredToggleLabel": "Toggle updated structured native chat",
+            "resumeTitle": "Reconnect working chats automatically after a restart",
+            "resumeCopy": "When Orca quits or installs an update, chats that were mid-turn are offered again on the next launch. On, they are reconnected without asking and Orca tells you afterwards — the same thing as ticking \"Don't ask again\" in that prompt. Off, you choose from the list each time. Reconnecting restores a chat where it stopped; it does not continue the interrupted reply.",
+            "resumeToggleLabel": "Toggle automatic reconnect after a restart"
           },
           "agentDashboard": {
             "title": "Agent Dashboard",
@@ -7144,7 +7204,9 @@
           "b82f86d7d2": "Rich Markdown Spellcheck",
           "5195f0b9ef": "Show browser spelling underlines and suggestions while editing rich Markdown.",
           "7ddd66fede": "Editor Word Wrap",
-          "9b18de6eea": "Wrap long lines in file editors instead of requiring horizontal scrolling."
+          "9b18de6eea": "Wrap long lines in file editors instead of requiring horizontal scrolling.",
+          "collapseUnchangedTitle": "Collapse Unchanged Regions",
+          "collapseUnchangedDescription": "Show only changed lines and a little surrounding context in a file diff, hiding the rest behind expandable bands. The View All Changes diff always collapses this way."
         },
         "AdvancedNetworkSettingsSection": {
           "3e431564b5": "localhost, 127.0.0.1, *.internal",
@@ -7161,6 +7223,8 @@
           "configureProxy": "Configure proxy"
         },
         "GeneralPane": {
+          "confirm_running_terminal_close": "Confirm before closing running terminals",
+          "confirm_running_terminal_close_description": "Ask before stopping a running agent or command when closing a terminal.",
           "d58fccfd84": "Navigation",
           "5cb5475664": "Confirm before closing pinned tabs",
           "36b2a5dc6d": "Show a confirmation dialog before a pinned tab is closed.",
@@ -9683,6 +9747,11 @@
             "005be5c699": "Wrap long lines in file editors instead of requiring horizontal scrolling.",
             "editorFontFamily": "Editor Font Family",
             "editorFontFamilyDesc": "Font used by file editors and diff views. Leave empty to follow the terminal font.",
+            "collapseUnchanged": "Collapse Unchanged Regions",
+            "collapseUnchangedDesc": "Show only changed lines and a little surrounding context in a file diff, hiding the rest behind expandable bands. The View All Changes diff always collapses this way.",
+            "collapseUnchangedKw": "collapse",
+            "hideUnchangedKw": "hide unchanged",
+            "foldKw": "fold",
             "externalWorktrees": "External worktrees",
             "externalWorktreesDescription": "Choose whether worktrees created outside Orca appear by default.",
             "editorFontKw": "font",
@@ -9701,7 +9770,14 @@
             "sidebar": "sidebar",
             "867dddea41": "pinned",
             "5250cf0e48": "pin",
-            "afa37a34e1": "close"
+            "afa37a34e1": "close",
+            "running_terminal": "running",
+            "terminal": "terminal",
+            "agent": "agent",
+            "command": "command",
+            "confirm": "confirm",
+            "close": "close",
+            "omp": "OMP"
           }
         },
         "git": {
@@ -10199,6 +10275,12 @@
             "keepForkUpToDateDescription": "Safely fast-forward this fork from upstream.",
             "projectRuntime": "Project Runtime",
             "projectRuntimeDescription": "Choose whether this project runs on Windows or WSL.",
+            "githubAccount": "GitHub Account",
+            "githubAccountDescription": "Bind a keyring gh login for this project’s GitHub API calls.",
+            "githubAccountKeyword": "github account",
+            "ghAccount": "gh account",
+            "login": "login",
+            "token": "token",
             "externalWorktrees": "External worktrees",
             "externalWorktreesDescription": "Override whether worktrees created outside Orca appear for this project.",
             "waitForSetupBeforeAgent": "wait for setup before starting agent",
@@ -11273,8 +11355,18 @@
           "descriptionOrca": "Links open in your system browser. When enabled, {{chord}}+click opens one in Orca's built-in browser instead."
         },
         "BrowserTerminalLinkActionsSetting": {
-          "title": "Show link actions",
-          "description": "Show available actions when you click a link in the terminal or a chat transcript. Turn this off to require {{modifier}}-click in the terminal."
+          "title": "Terminal URL clicks",
+          "description": "Show available actions when you click a link in the terminal or a chat transcript. Turn this off to require {{modifier}}-click in the terminal.",
+          "descriptionV2": "Control clicks on detected URLs printed in terminal panes and chat transcripts.",
+          "plainClickLabel": "Plain click",
+          "plainClickDescription": "Choose whether a left-click shows actions, opens the URL, or leaves it to the terminal. Cmd/Ctrl-click always opens directly.",
+          "plainClickAriaLabel": "Plain click URL behavior",
+          "middleClickLabel": "Middle click",
+          "middleClickDescription": "Choose what a mouse-wheel click does on a detected terminal URL.",
+          "middleClickAriaLabel": "Middle click",
+          "actionsLabel": "Actions",
+          "openUrlLabel": "Open URL",
+          "leaveToTerminalLabel": "Leave to terminal"
         },
         "PluginConsentDialog": {
           "workerTrust": "Background worker — runs its own process",
@@ -11771,6 +11863,25 @@
           "auto": "Agent",
           "off": "Off"
         },
+        "RepositoryGitHubAccountSection": {
+          "unsupported": "This runtime’s GitHub CLI is too old for account binding (needs gh ≥ 2.40).",
+          "capabilityUnknown": "Could not determine whether this runtime’s GitHub CLI supports account binding. Retry.",
+          "envToken": "Environment-token accounts cannot be bound. Use a keyring login.",
+          "invalidBinding": "That GitHub account binding is invalid.",
+          "unavailable": "That GitHub account is unavailable on this runtime.",
+          "saveFailed": "Could not save the GitHub account binding.",
+          "title": "GitHub Account",
+          "description": "Use a specific gh login for this project’s GitHub issue and pull request calls.",
+          "longDescription": "Orca injects a short-lived token from the selected keyring login into each gh call for this project. Project View stays on the ambient login.",
+          "retry": "Retry",
+          "selectLabel": "Account",
+          "ambient": "Default (ambient gh login)",
+          "unavailableOption": "{{user}} @ {{host}} (unavailable)",
+          "capabilityBlocked": "Binding is unavailable until this runtime’s GitHub CLI supports `gh auth token --user` (gh ≥ 2.40).",
+          "capabilityUnknownHint": "Could not determine GitHub CLI account-binding support on this runtime. Clear the binding or retry.",
+          "notEnforced": "Saved, but not enforced by this runtime (mixed-version host).",
+          "refreshAccounts": "Refresh GitHub accounts"
+        },
         "shareSkills": {
           "title": "Share Skills",
           "description": "Share your skills with an unlisted link. Anyone who has it can install them.",
@@ -11897,6 +12008,10 @@
           "targetDescription": "Higher values increase contrast where possible. Background colors stay unchanged.",
           "subtle": "Subtle",
           "strong": "Strong"
+        },
+        "TerminalRenderingSection": {
+          "6d4c55bacc": "Inline Images",
+          "fffab5890b": "Display images directly in the terminal using SIXEL, iTerm2 (IIP), and Kitty graphics protocols."
         }
       },
       "right": {
@@ -17236,6 +17351,7 @@
         "command": "Background command",
         "monitor": "Background monitor",
         "task": "Background task",
+        "outputFile": "Output: {{value0}}",
         "detailsUnavailable": "Task details are unavailable for this session.",
         "countAgentsOne": "1 agent",
         "countAgentsMany": "{{value0}} agents",
@@ -17900,8 +18016,8 @@
       "truncated": "Some results or matching text were limited. Narrow your search for more precise results.",
       "enableFailed": "Could not enable search. Try again.",
       "enable": "Enable",
-      "notNow": "Not now",
-      "retry": "Try again"
+      "retry": "Try again",
+      "scopeUnknown": "This computer does not have this workspace or project. Switch the scope to All to search everything on it."
     }
   },
   "sessionHistory": {

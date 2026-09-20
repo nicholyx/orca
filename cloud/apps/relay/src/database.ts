@@ -6,6 +6,7 @@ import pg from 'pg'
 import { RELAY_REGIONS } from '@orca-cloud/relay-contract'
 import {
   emptyPostgresPoolPressureCounts,
+  isPostgresPoolConnectFailure,
   PostgresPoolPressure,
   type PostgresPoolPressureCounts
 } from './postgres-pool-pressure.js'
@@ -99,6 +100,18 @@ CREATE TABLE IF NOT EXISTS relay_invites (
 CREATE INDEX IF NOT EXISTS relay_invites_device
   ON relay_invites(user_id, relay_host_id, relay_device_id);
 
+-- schema-deferrable: created out of band, so a boot that cannot take the lock must retry
+-- Why: the credential sweep matches (state, expires_at) every cycle while invites in a terminal
+-- state accumulate for the life of the database. Unindexed it seq-scans the whole table inside the
+-- maintenance transaction. Partial, so the index holds only the states the sweep can act on.
+CREATE INDEX IF NOT EXISTS relay_invites_sweep_expiry
+  ON relay_invites(expires_at) WHERE state IN ('available', 'reserved', 'cooldown');
+
+-- schema-deferrable: created out of band, so a boot that cannot take the lock must retry
+-- Why: the second sweep pass matches (state, reservation_expires_at) over the same table.
+CREATE INDEX IF NOT EXISTS relay_invites_sweep_reservation
+  ON relay_invites(reservation_expires_at) WHERE state = 'reserved';
+
 CREATE TABLE IF NOT EXISTS relay_devices (
   user_id TEXT NOT NULL,
   relay_host_id TEXT NOT NULL,
@@ -159,6 +172,11 @@ CREATE TABLE IF NOT EXISTS relay_connection_bases (
 -- accumulate unboundedly. Unindexed it seq-scans millions of rows every cycle
 -- and holds the maintenance transaction open long enough to time out
 -- assignment lock waits.
+-- Why not a partial index on active = 1: a basis is inserted active and flipped to 0, so each
+-- deactivation leaves a dead entry in that index too. Measured on production-shaped history it
+-- carries the same dead entries as this one, the planner picks this one in every state, and it
+-- costs ~65 bytes of WAL per insert. Bloat here is cured by reaping and vacuum, not by a narrower
+-- index.
 CREATE INDEX IF NOT EXISTS relay_connection_bases_active_deadline
   ON relay_connection_bases(active, deadline);
 
@@ -171,6 +189,12 @@ CREATE TABLE IF NOT EXISTS relay_direct_authorizations (
   deadline BIGINT NOT NULL,
   consumed_at BIGINT
 );
+
+-- schema-deferrable: created out of band, so a boot that cannot take the lock must retry
+-- Why: the sweep expires pending authorizations by (consumed_at IS NULL, deadline), and consumed
+-- rows are never deleted. Partial, so the index stays the size of the pending set.
+CREATE INDEX IF NOT EXISTS relay_direct_authorizations_pending_deadline
+  ON relay_direct_authorizations(deadline) WHERE consumed_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS relay_confirm_results (
   user_id TEXT NOT NULL,
@@ -523,8 +547,9 @@ CREATE TABLE IF NOT EXISTS relay_assignment_activity_leases (
   updated_at BIGINT NOT NULL,
   PRIMARY KEY (user_id, relay_host_id, activity_id)
 );
-CREATE INDEX IF NOT EXISTS relay_assignment_activity_expiry
-  ON relay_assignment_activity_leases(expires_at);
+-- expires_at is deliberately unindexed: every control renewal writes it (~471/s), so an index on
+-- it makes each renewal a non-HOT update that rewrites index entries. Its only reader is the 30s
+-- expiry sweep, which seq-scans 14.8k rows / 7MB in a few milliseconds.
 
 CREATE TABLE IF NOT EXISTS relay_control_connection_reservations (
   reservation_id TEXT PRIMARY KEY,
@@ -557,6 +582,12 @@ CREATE TABLE IF NOT EXISTS relay_rate_windows (
   count BIGINT NOT NULL,
   PRIMARY KEY (scope_key, window_kind, window_started_at)
 );
+
+-- schema-deferrable: created out of band, so a boot that cannot take the lock must retry
+-- Why: window_started_at is the PRIMARY KEY's last column, so the sweep's 24h retention delete
+-- cannot use it and seq-scans instead.
+CREATE INDEX IF NOT EXISTS relay_rate_windows_started
+  ON relay_rate_windows(window_started_at);
 
 CREATE TABLE IF NOT EXISTS relay_migration_leases (
   user_id TEXT NOT NULL,
@@ -644,7 +675,24 @@ export const POSTGRES_SCHEMA_MIGRATIONS = [
      ADD COLUMN IF NOT EXISTS host_cooldown_ms BIGINT NOT NULL
      DEFAULT ${REGIONAL_REHOME_DEFAULT_HOST_COOLDOWN_MS}`,
   `ALTER TABLE relay_control_capabilities ADD COLUMN IF NOT EXISTS idle_regional_rehome BIGINT NOT NULL DEFAULT 0`,
-  `ALTER TABLE relay_region_rehome_attempts ADD COLUMN IF NOT EXISTS source_generation BIGINT NOT NULL DEFAULT 0`
+  `ALTER TABLE relay_region_rehome_attempts ADD COLUMN IF NOT EXISTS source_generation BIGINT NOT NULL DEFAULT 0`,
+  // Dropped, not created: see the comment on relay_assignment_activity_leases. Deferrable because
+  // this is the one boot where it has to take ACCESS EXCLUSIVE on a table under continuous write,
+  // and all 28 directors reach it at once; a lock timeout here must not restart the instance, which
+  // would only re-queue the same DDL behind the same writers. Once it wins, the pre-check answers
+  // absent and no later boot sends it at all.
+  `-- schema-deferrable: one boot has to win ACCESS EXCLUSIVE on a table written ~475/s
+   DROP INDEX IF EXISTS relay_assignment_activity_expiry`,
+  // The drop is what makes HOT legal; this is what makes it possible. A renewal can only reuse the
+  // row's own page when that page has room for a second version, and at the default fillfactor of
+  // 100 a freshly filled page has none - measured at 0.5% HOT with the index gone and the default,
+  // against 100% at 70. Takes SHARE UPDATE EXCLUSIVE, which blocks vacuum and DDL but no reader or
+  // writer, and only for the catalog write. Applies to pages as they refill, so the table converges
+  // over its own renewal cycle rather than at boot.
+  // Deferrable for the same reason, though SHARE UPDATE EXCLUSIVE blocks only vacuum and DDL: it
+  // buys nothing until the drop lands, so a boot that deferred the drop should defer this too.
+  `-- schema-deferrable: buys nothing until the drop above lands
+   ALTER TABLE relay_assignment_activity_leases SET (fillfactor = 70)`
 ]
 
 // The exact statement list a Postgres boot applies, in order, so the lock-target census can read
@@ -924,13 +972,15 @@ function retryablePostgresTransactionError(error: unknown): boolean {
 }
 
 export function isRelayDatabaseTransientError(error: unknown): boolean {
-  const code = String((error as { code?: unknown }).code)
+  // Runs inside the query catch, where a thrown null or undefined would turn a
+  // database failure into a TypeError that buries it.
+  const code = String((error as { code?: unknown } | null)?.code)
   if (['40P01', '40001', '55P03', '57014', '53300', '57P03', '08001', '08006'].includes(code)) {
     return true
   }
-  return String((error as { message?: unknown }).message).includes(
-    'timeout exceeded when trying to connect'
-  )
+  // A pool that cannot hand out a client reports no SQLSTATE at all, so the
+  // acquire boundary owns that vocabulary.
+  return isPostgresPoolConnectFailure(error)
 }
 
 async function waitForPostgresRetry(random: () => number = Math.random): Promise<void> {
@@ -965,6 +1015,9 @@ class PostgresDatabase implements RelayDatabase {
         error,
         phase,
         sql,
+        // Passed in rather than re-derived: the log has to say what the routes
+        // actually did, and one classifier cannot drift from itself.
+        transient: isRelayDatabaseTransientError(error),
         elapsedMs: performance.now() - startedAt,
         pool: this.pool
       })
@@ -1155,13 +1208,15 @@ async function backfillRelayCellRegions(database: RelayDatabase): Promise<void> 
   )
 }
 
-export async function openRelayDatabase(input: {
+export type RelayDatabaseOpenInput = {
   databaseUrl?: string
   dataDir: string
   poolMax?: number
   applicationName?: string
   statementTimeoutMs?: number
-}): Promise<RelayDatabase> {
+}
+
+export async function openRelayDatabase(input: RelayDatabaseOpenInput): Promise<RelayDatabase> {
   let database: RelayDatabase
   if (input.databaseUrl) {
     await applySchemaOnUntimedPool(input.databaseUrl, input.applicationName)

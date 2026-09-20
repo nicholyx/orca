@@ -27,10 +27,11 @@ import {
   createRegionalRehomeTokenVerifier,
   createRuntimeTokenVerifier
 } from './admin-token-verifier.js'
-import type {
-  CellFenceAttemptEvidence,
-  RelayAssignment,
-  RelayAssignmentStore
+import {
+  RelayHomeCellUnavailableError,
+  type CellFenceAttemptEvidence,
+  type RelayAssignment,
+  type RelayAssignmentStore
 } from './assignment-store.js'
 import { AssignmentRejectionLogWindow } from './assignment-rejection-log-window.js'
 import { CELL_ADMISSION_STATES } from './cell-admission-selector.js'
@@ -58,6 +59,8 @@ const RelayCellConnectionHardCapSchema = z.custom<RelayCellConnectionHardCap>(
 
 const ASSIGNMENT_REJECTION_LOG_WINDOW_MS = 10_000
 const REGION_CATALOG_CACHE_MS = 30_000
+// A drain that outlives the roll step it belongs to is an outage, not a pacing win.
+const DRAIN_PACE_WINDOW_MAX_MS = 5 * 60 * 1_000
 
 type AdmissionRejectionLogEntry = {
   route: 'assign' | 'resolve'
@@ -72,7 +75,7 @@ export function createRelayApp(
   operations: {
     store: RelayCredentialStore
     assignments: RelayAssignmentStore
-    drain: (graceMs: number) => void
+    drain: (graceMs: number, options?: { paceWindowMs?: number }) => void
     idleRehome?: (input: IdleRegionalRehomeRequest & {
       cohortPercent: number
       directorSafety: RegionalRehomeSafetySnapshot
@@ -176,6 +179,21 @@ export function createRelayApp(
     context.header('Retry-After', String(stickyRetryAfterSeconds))
     return context.json({ error: 'assignments_temporarily_unavailable' }, 503)
   }
+  // An admin route that collapses every failure into one status cannot tell a
+  // real conflict from a database that was briefly out of reach, and the rollout
+  // tooling retries on 503 only. Transient failures get the answer the public
+  // routes already give; everything else keeps the route's own mapping.
+  const rejectAdminOperation = (
+    context: Context,
+    error: unknown,
+    status: 404 | 409
+  ): Response => {
+    if (!isRelayDatabaseTransientError(error)) {
+      return context.json({ error: operationError(error) }, status)
+    }
+    context.header('Retry-After', String(config.publicAssignmentRetryAfterSeconds))
+    return context.json({ error: 'database_temporarily_unavailable' }, 503)
+  }
   // Aggregate counters cannot separate a handful of pathological hosts from a broad
   // population, so every admission rejection names its host and reason. Keyed on
   // route:lane:reason rather than host, the log stays bounded under load.
@@ -223,7 +241,15 @@ export function createRelayApp(
   })
   app.get('/v1/regions', async (context) => {
     if (config.role === 'cell') return context.json({ error: 'director_only' }, 404)
-    return context.json({ v: 1, regions: await regionCatalog() })
+    try {
+      return context.json({ v: 1, regions: await regionCatalog() })
+    } catch (error) {
+      if (!isRelayDatabaseTransientError(error)) throw error
+      // Same contract as the assignment routes: a database that is briefly out
+      // of reach is a retry, not a director fault.
+      context.header('Retry-After', String(config.publicAssignmentRetryAfterSeconds))
+      return context.json({ error: 'region_catalog_temporarily_unavailable' }, 503)
+    }
   })
   app.post('/v1/assign', async (context) => {
     if (config.role === 'cell') return context.json({ error: 'director_only' }, 404)
@@ -336,16 +362,17 @@ export function createRelayApp(
         }
       }
     } catch (error) {
-      if (isRelayAssignmentCapacityError(error) || isRelayDatabaseTransientError(error)) {
+      if (isRelayAssignmentUnavailableError(error) || isRelayDatabaseTransientError(error)) {
         logAssignmentRejection({
           route: 'assign',
           lane,
           hinted: Boolean(body.data.reconnect),
           relayHostId: claims.relayHostId,
-          reason: operationError(error)
+          reason: operationError(error),
+          ...homeCellRejectionDetail(error)
         })
       }
-      if (isRelayAssignmentCapacityError(error)) {
+      if (isRelayAssignmentUnavailableError(error)) {
         if (lane === 'placement') {
           operations.recordRegionSelection?.({ targetRegion, fallback: false })
         }
@@ -364,11 +391,13 @@ export function createRelayApp(
       fallback: lane === 'placement' && assignment.region !== targetRegion
     })
     // Grant-side counterpart of the rejection log: reconnect grants are rare
-    // enough to log and make "which cell is this host on" answerable.
-    if (lane === 'sticky') {
+    // enough to log and make "which cell is this host on" answerable. The
+    // placement-lane ones matter most — they are the only record that a host
+    // whose sticky lane failed verification landed anywhere at all.
+    if (body.data.reconnect) {
       console.warn(
-        `[orca-relay] assignment granted lane=sticky host=${relayHostLogDigest(claims.relayHostId)}` +
-          ` cell=${assignment.cellId}`
+        `[orca-relay] assignment granted lane=${lane} hinted=true` +
+          ` host=${relayHostLogDigest(claims.relayHostId)} cell=${assignment.cellId}`
       )
     }
     const lease = await new SignJWT({
@@ -441,16 +470,17 @@ export function createRelayApp(
         leaseExpiresAt: assignment.leaseExpiresAt
       })
     } catch (error) {
-      if (isRelayAssignmentCapacityError(error) || isRelayDatabaseTransientError(error)) {
+      if (isRelayAssignmentUnavailableError(error) || isRelayDatabaseTransientError(error)) {
         logAssignmentRejection({
           route: 'resolve',
           lane: 'none',
           hinted: false,
           relayHostId: body.data.relayHostId,
-          reason: operationError(error)
+          reason: operationError(error),
+          ...homeCellRejectionDetail(error)
         })
       }
-      if (isRelayAssignmentCapacityError(error)) {
+      if (isRelayAssignmentUnavailableError(error)) {
         return context.json({ error: operationError(error) }, 503)
       }
       if (isRelayDatabaseTransientError(error)) return rejectPublicAssignment(context)
@@ -465,12 +495,18 @@ export function createRelayApp(
       return context.json({ error: 'invalid_token' }, 401)
     }
     const body = z
-      .object({ v: z.literal(1), graceMs: z.number().int().nonnegative().max(60 * 60 * 1000) })
+      .object({
+        v: z.literal(1),
+        graceMs: z.number().int().nonnegative().max(60 * 60 * 1000),
+        // Spreads the drain sends, and so the re-dials, over this window.
+        paceWindowMs: z.number().int().nonnegative().max(DRAIN_PACE_WINDOW_MAX_MS).optional()
+      })
       .strict()
       .safeParse(await context.req.json().catch(() => null))
     if (!body.success) return context.json({ error: 'invalid_request' }, 400)
-    operations.drain(body.data.graceMs)
-    return context.json({ ok: true })
+    const paceWindowMs = body.data.paceWindowMs ?? 0
+    operations.drain(body.data.graceMs, { paceWindowMs })
+    return context.json({ ok: true, paceWindowMs })
   })
   app.post('/v1/admin/host-idle-rehome', async (context) => {
     if (config.role !== 'cell' || !operations.idleRehome) {
@@ -497,7 +533,7 @@ export function createRelayApp(
     try {
       return context.json({ v: 1, ...(await operations.idleRehome(body.data)) })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/host-drain', async (context) => {
@@ -548,7 +584,7 @@ export function createRelayApp(
         ...(sharedRuntimeIdentityRejected ? { sharedRuntimeIdentityRejected } : {})
       })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/runtime-status', async (context) => {
@@ -602,7 +638,7 @@ export function createRelayApp(
       await operations.assignments.recordCellHeartbeat(body.data)
       return context.json({ ok: true })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/cell-rehome-status', async (context) => {
@@ -622,7 +658,7 @@ export function createRelayApp(
       await operations.assignments.recordCellRegionalRehomeStatus(body.data)
       return context.json({ ok: true })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.get('/v1/admin/regional-rehome-preview', async (context) => {
@@ -661,7 +697,7 @@ export function createRelayApp(
       const control = await operations.assignments.applyRegionalRehomeControl(body.data)
       return context.json({ v: 1, control })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/regional-rehome-trust-probe', async (context) => {
@@ -705,7 +741,7 @@ export function createRelayApp(
       })
       return context.json(result)
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/evacuate', async (context) => {
@@ -726,7 +762,7 @@ export function createRelayApp(
       )
       return context.json({ v: 1, migration })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/migration-complete', async (context) => {
@@ -747,7 +783,7 @@ export function createRelayApp(
       )
       return context.json({ ok: true })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/migration-supersede-cell', async (context) => {
@@ -772,7 +808,7 @@ export function createRelayApp(
       )
       return context.json({ v: 1, superseded })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/rebalance-dormant', async (context) => {
@@ -793,7 +829,7 @@ export function createRelayApp(
       )
       return context.json({ v: 1, assignment })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/admission-selector/apply', async (context) => {
@@ -813,7 +849,7 @@ export function createRelayApp(
       const result = await operations.assignments.applyCellAdmissionSelector(body.data)
       return context.json({ v: 1, ...result })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/admission-selector/apply-staging-asia-proof', async (context) => {
@@ -838,7 +874,7 @@ export function createRelayApp(
       })
       return context.json({ v: 1, ...result })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/admission-selector/status', async (context) => {
@@ -860,7 +896,7 @@ export function createRelayApp(
       )
       return context.json({ v: 1, ...result })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/admission-selector/add-migration-cells', async (context) => {
@@ -891,7 +927,7 @@ export function createRelayApp(
       })
       return context.json({ v: 1, ...result })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/cell-state', async (context) => {
@@ -916,7 +952,7 @@ export function createRelayApp(
       )
       return context.json({ ok: true })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/cell-fence-adopt-legacy', async (context) => {
@@ -939,7 +975,7 @@ export function createRelayApp(
       )
       return context.json({ v: 1, cellId: body.data.cellId, expiresAt })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/cell-fence-commit-legacy-adoption', async (context) => {
@@ -962,7 +998,7 @@ export function createRelayApp(
       )
       return context.json({ v: 1, cellId: body.data.cellId, committed: true })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/cell-fence-attest', async (context) => {
@@ -991,7 +1027,7 @@ export function createRelayApp(
         attempt: result.attempt
       })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/cell-fence-attempt-prepare', async (context) => {
@@ -1012,7 +1048,7 @@ export function createRelayApp(
       const attempt = await operations.assignments.prepareCellFenceAttempt(evidence)
       return context.json({ v: 1, attempt })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/cell-fence-attempt-start', async (context) => {
@@ -1037,7 +1073,7 @@ export function createRelayApp(
       )
       return context.json({ v: 1, ...result })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/cell-fence-attempt-plan', async (context) => {
@@ -1061,7 +1097,7 @@ export function createRelayApp(
       )
       return context.json({ v: 1, attempt })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/cell-fence-attempt-operation', async (context) => {
@@ -1087,7 +1123,7 @@ export function createRelayApp(
       )
       return context.json({ v: 1, ...result })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/cell-fence-attempt-status', async (context) => {
@@ -1107,7 +1143,7 @@ export function createRelayApp(
       const attempt = await operations.assignments.cellFenceAttempt(body.data.cellId)
       return context.json({ v: 1, attempt })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/cell-fence-attempt-abort', async (context) => {
@@ -1128,7 +1164,7 @@ export function createRelayApp(
       const attempt = await operations.assignments.abortCellFenceAttempt(evidence)
       return context.json({ v: 1, attempt })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/drain-attempt-prepare', async (context) => {
@@ -1154,7 +1190,7 @@ export function createRelayApp(
       })
       return context.json({ v: 1, ...result })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/drain-attempt-send', async (context) => {
@@ -1174,7 +1210,7 @@ export function createRelayApp(
       const attempt = await operations.assignments.beginCellDrainSend(body.data)
       return context.json({ v: 1, attempt })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/drain-attempt-receipt', async (context) => {
@@ -1196,7 +1232,7 @@ export function createRelayApp(
       )
       return context.json({ v: 1, attempt })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/drain-attempt-recover-forward', async (context) => {
@@ -1216,7 +1252,7 @@ export function createRelayApp(
       const result = await operations.assignments.prepareCellDrainRecovery(body.data)
       return context.json({ v: 1, ...result })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/cell-config', async (context) => {
@@ -1243,7 +1279,7 @@ export function createRelayApp(
       )
       return context.json({ ok: true })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/evacuate-cell', async (context) => {
@@ -1265,7 +1301,7 @@ export function createRelayApp(
       )
       return context.json({ v: 1, started })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/evacuation-capacity', async (context) => {
@@ -1288,7 +1324,7 @@ export function createRelayApp(
       )
       return context.json({ v: 1, ...capacity })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 409)
+      return rejectAdminOperation(context, error, 409)
     }
   })
   app.post('/v1/admin/evacuation-status', async (context) => {
@@ -1307,12 +1343,17 @@ export function createRelayApp(
     if (body.data.completeReady && (await verifyReadOnlyAdminToken(bearer))) {
       return context.json({ error: 'insufficient_permission' }, 403)
     }
-    const status = await operations.assignments.cellEvacuationStatus(
-      body.data.sourceCellId,
-      body.data.targetCellId,
-      body.data.completeReady
-    )
-    return context.json({ v: 1, ...status })
+    try {
+      const status = await operations.assignments.cellEvacuationStatus(
+        body.data.sourceCellId,
+        body.data.targetCellId,
+        body.data.completeReady
+      )
+      return context.json({ v: 1, ...status })
+    } catch (error) {
+      if (!isRelayDatabaseTransientError(error)) throw error
+      return context.json({ error: 'database_temporarily_unavailable' }, 503)
+    }
   })
   app.post('/v1/admin/cell-status', async (context) => {
     const bearer = readBearer(context.req.header('authorization'))
@@ -1329,7 +1370,7 @@ export function createRelayApp(
       const status = await operations.assignments.cellDeploymentStatus(body.data.cellId)
       return context.json({ v: 1, status })
     } catch (error) {
-      return context.json({ error: operationError(error) }, 404)
+      return rejectAdminOperation(context, error, 404)
     }
   })
   return app
@@ -1912,23 +1953,39 @@ function logAssignmentRejection(input: {
   hinted: boolean
   relayHostId: string
   reason: string
+  cause?: string
+  cell?: string
   suppressed?: number
 }): void {
   console.warn(
     `[orca-relay] assignment rejected route=${input.route} lane=${input.lane}` +
       ` hinted=${input.hinted} reason=${input.reason}` +
       ` host=${relayHostLogDigest(input.relayHostId)}` +
+      (input.cause === undefined ? '' : ` cause=${input.cause}`) +
+      (input.cell === undefined ? '' : ` cell=${input.cell}`) +
       (input.suppressed === undefined ? '' : ` suppressed=${input.suppressed}`)
   )
 }
 
-function isRelayAssignmentCapacityError(error: unknown): boolean {
+// The home-cell reason is not capacity, but it is the same answer to the client:
+// retry, the director cannot place you right now.
+function isRelayAssignmentUnavailableError(error: unknown): boolean {
   return (
     error instanceof Error &&
-    ['relay_capacity_exhausted', 'relay_connection_headroom_exhausted'].includes(
-      error.message
-    )
+    [
+      'relay_capacity_exhausted',
+      'relay_connection_headroom_exhausted',
+      'relay_home_cell_unavailable'
+    ].includes(error.message)
   )
+}
+
+function homeCellRejectionDetail(
+  error: unknown
+): { cause: string; cell: string } | Record<string, never> {
+  return error instanceof RelayHomeCellUnavailableError
+    ? { cause: error.unavailableCause, cell: error.cellId }
+    : {}
 }
 
 function isCanonicalRelayOrigin(value: string): boolean {

@@ -1,7 +1,8 @@
+import { separateImagePasteFromFollowingText } from '../../../src/shared/image-paste-following-text'
 import { reportWorkerTerminalUserInput } from '../terminal/worker-terminal-takeover-report'
 import { useCallback, type RefObject } from 'react'
 import { terminalInputSend } from '../terminal/mobile-terminal-operations'
-import * as Clipboard from 'expo-clipboard'
+import { useClipboardReader } from '../platform/clipboard'
 import { File as FsFile, Paths } from 'expo-file-system'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import type { TerminalModes } from '../terminal/terminal-webview-contract'
@@ -72,6 +73,7 @@ function buildMobileTerminalClipboardTextPayload(
 }
 
 type UseMobileTerminalPasteOptions = {
+  readonly agent?: string | null
   readonly activeHandle: string | null
   readonly activeHandleRef: RefObject<string | null>
   readonly activeSessionTabTypeRef: RefObject<string | null>
@@ -92,6 +94,7 @@ type UseMobileTerminalPasteOptions = {
 
 export function useMobileTerminalPaste({
   activeHandle,
+  agent,
   activeHandleRef,
   activeSessionTabTypeRef,
   canSend,
@@ -108,13 +111,14 @@ export function useMobileTerminalPaste({
   refreshCanPaste,
   showToast
 }: UseMobileTerminalPasteOptions): () => Promise<void> {
+  const clipboard = useClipboardReader()
   return useCallback(async () => {
     if (!client || !activeHandle || !canSend) {
       return
     }
     const targetHandle = activeHandle
     try {
-      const text = await Clipboard.getStringAsync()
+      const text = await clipboard.readText()
       let payload: string | null = null
       if (text.length > 0) {
         payload = buildMobileTerminalClipboardTextPayload(
@@ -122,7 +126,7 @@ export function useMobileTerminalPaste({
           ptyModesRef.current.get(targetHandle)
         )
       } else {
-        const image = await Clipboard.getImageAsync({ format: 'png' })
+        const image = await clipboard.readImage()
         if (!image) {
           refreshCanPaste()
           return
@@ -132,7 +136,10 @@ export function useMobileTerminalPaste({
         const imagePath = await saveMobileClipboardImageAsTempFile(client, base64, {
           connectionId
         })
-        payload = buildMobileImagePastePayload(imagePath)
+        payload = separateImagePasteFromFollowingText(
+          buildMobileImagePastePayload(imagePath, agent),
+          true
+        )
       }
 
       const wrappedBytes = new TextEncoder().encode(payload).byteLength
@@ -186,6 +193,8 @@ export function useMobileTerminalPaste({
     }
   }, [
     activeHandle,
+    agent,
+    clipboard,
     activeHandleRef,
     activeSessionTabTypeRef,
     canSend,

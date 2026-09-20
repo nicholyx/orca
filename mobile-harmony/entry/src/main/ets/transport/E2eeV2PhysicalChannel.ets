@@ -17,7 +17,7 @@ import { concatBytes } from '../core/bytes/Bytes';
 import { encodeUtf8 } from '../core/bytes/Utf8';
 import { hasExactKeys, parseJsonRecord, asString, asNumber } from '../core/json/JsonValue';
 import { E2eeV2ClientSession } from '../core/e2ee/E2eeV2ClientSession';
-import { OutboundBackpressureQueue } from '../core/rpc/OutboundQueue';
+import { OutboundBackpressureQueue, OutboundOverflowEvidence } from '../core/rpc/OutboundQueue';
 
 export const E2EE_V2_CHANNEL_STATE_AWAITING_READY = 'awaiting-ready';
 export const E2EE_V2_CHANNEL_STATE_AWAITING_AUTHENTICATED = 'awaiting-authenticated';
@@ -105,7 +105,16 @@ export class E2eeV2PhysicalChannel {
       },
       getBufferedAmount: () => this.socket.bufferedAmount,
       isWritable: () => this.socket.readyState === this.socket.openState,
-      onOverflow: () => this.onError(new Error('E2EE v2 outbound buffer overflow'))
+      // The bound that tripped and the backlog it held, because the connection
+      // log is the only diagnostic a phone user can reach.
+      onOverflow: (evidence: OutboundOverflowEvidence) =>
+        this.onError(
+          new Error(
+            `E2EE v2 outbound buffer overflow (${evidence.cap}): ` +
+              `${evidence.queuedBytes}B/${evidence.maxQueuedBytes}B, ` +
+              `${evidence.queuedFrames}/${evidence.maxQueuedFrames} frames`
+          )
+        )
     });
   }
 

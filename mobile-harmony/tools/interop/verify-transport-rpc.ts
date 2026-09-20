@@ -189,15 +189,21 @@ export function runRpcShapeSections(): void {
 
     const wire = (buffered: number, writable: boolean): Wire => ({ buffered, writable, sent: [] })
 
-    const options = (target: Wire, clock: FakeClock, overflow: { count: number }) => ({
+    /** What each side's onOverflow callback was handed, for the parity check. */
+    type OverflowRecord = { count: number; evidence: object | null }
+
+    const options = (target: Wire, clock: FakeClock, overflow: OverflowRecord) => ({
       send: (frame: string) => {
         target.sent.push(frame)
       },
       byteLengthOf: (frame: string) => frame.length,
       getBufferedAmount: () => target.buffered,
       isWritable: () => target.writable,
-      onOverflow: () => {
+      // `object` is a supertype of both sides' evidence type, so one callback
+      // satisfies the port's signature and the reference's alike.
+      onOverflow: (evidence: object) => {
         overflow.count++
+        overflow.evidence = evidence
       },
       softCapBytes: 100,
       maxQueuedBytes: 400,
@@ -210,10 +216,10 @@ export function runRpcShapeSections(): void {
     const pair = (buffered: number, writable: boolean) => {
       const ourWire = wire(buffered, writable)
       const ourClock = new FakeClock()
-      const ourOverflow = { count: 0 }
+      const ourOverflow: OverflowRecord = { count: 0, evidence: null }
       const refWire = wire(buffered, writable)
       const refClock = new FakeClock()
-      const refOverflow = { count: 0 }
+      const refOverflow: OverflowRecord = { count: 0, evidence: null }
       return {
         ourWire,
         ourClock,
@@ -265,6 +271,11 @@ export function runRpcShapeSections(): void {
       }
       check('our overflow fired once', p.ourOverflow.count === 1, String(p.ourOverflow.count))
       check('reference overflow fired once', p.refOverflow.count === 1, String(p.refOverflow.count))
+      check(
+        'the overflow evidence matches the reference (which bound tripped, and the backlog held)',
+        jsonEqual(p.ourOverflow.evidence, p.refOverflow.evidence),
+        `ours=${JSON.stringify(p.ourOverflow.evidence)} ref=${JSON.stringify(p.refOverflow.evidence)}`
+      )
       check('both queues dropped the backlog', p.ours.queuedFrames() === 0 && p.reference.evidence().queuedFrames === 0)
       check('further enqueues are refused', p.ours.enqueue('small') === false && p.reference.enqueue('small') === false)
     }
@@ -275,6 +286,11 @@ export function runRpcShapeSections(): void {
       const huge = 'y'.repeat(500)
       check('oversized frame refused by both', p.ours.enqueue(huge) === p.reference.enqueue(huge))
       check('oversized frame raised overflow in both', p.ourOverflow.count === 1 && p.refOverflow.count === 1)
+      check(
+        'the overflow evidence matches the reference (which bound tripped, and the backlog held)',
+        jsonEqual(p.ourOverflow.evidence, p.refOverflow.evidence),
+        `ours=${JSON.stringify(p.ourOverflow.evidence)} ref=${JSON.stringify(p.refOverflow.evidence)}`
+      )
       check('oversized frame was never sent', p.ourWire.sent.length === 0 && p.refWire.sent.length === 0)
     }
 

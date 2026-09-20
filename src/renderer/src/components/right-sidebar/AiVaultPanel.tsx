@@ -54,6 +54,7 @@ import { AgentSessionContinuationDialog } from '@/components/agent-session-conti
 import { AiVaultScanIssueBanners } from './AiVaultScanIssueBanners'
 import { useAiVaultSessionDeleteAction } from './ai-vault-session-delete-action'
 import { useAiVaultPanelSearch } from './use-ai-vault-search'
+import { aiVaultSearchScopeIdentity } from './ai-vault-search-scope-identity'
 import { AiVaultPanelSearch } from './AiVaultPanelSearch'
 
 export default function AiVaultPanel(): React.JSX.Element {
@@ -155,12 +156,14 @@ export default function AiVaultPanel(): React.JSX.Element {
     scanResult,
     sessions: history
   } = useAiVaultSessionRefresh(scopePaths, executionHostScope, sessionLimit)
-  const search = useAiVaultPanelSearch(
-    query,
-    agents,
-    scope === 'all' ? undefined : scope === 'workspace' ? activeWorktreePaths : scopePaths,
-    executionHostScope
+  // Why an identity and not paths: a project's worktrees are the host's to
+  // enumerate, and a repo with hundreds of them has no path list a request can carry.
+  const searchWithin = useMemo(
+    () =>
+      aiVaultSearchScopeIdentity({ scope, activeWorktreeId: activeWorktree?.id, activeProjectKey }),
+    [activeProjectKey, activeWorktree?.id, scope]
   )
+  const search = useAiVaultPanelSearch(query, agents, searchWithin, executionHostScope)
   const { searching, searchHits } = search
   const sessions = searching ? search.sessions : history
   // Deliberately blind to the active repo/worktree: rebuilding these session
@@ -359,11 +362,7 @@ export default function AiVaultPanel(): React.JSX.Element {
       ) : null}
 
       {!searching && <AiVaultScanIssueBanners scanResult={scanResult} />}
-      <AiVaultPanelSearch
-        search={search}
-        noAgents={agents.length === 0}
-        onDismiss={() => setQuery('')}
-      >
+      <AiVaultPanelSearch search={search} noAgents={agents.length === 0}>
         {(!searching || sessions.length > 0 || search.loading) && (
           <AiVaultSessionVirtualList
             key={searching ? search.resetKey : 'history'}

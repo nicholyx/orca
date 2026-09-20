@@ -19,6 +19,20 @@ const DEFAULT_MAX_QUEUED_BYTES = 64 * 1024 * 1024;
 const DEFAULT_MAX_QUEUED_FRAMES = 4096;
 const DEFAULT_DRAIN_POLL_MS = 25;
 
+/** Which hard bound tripped. Mirrors `WsOutboundOverflowEvidence['cap']`. */
+export type OutboundOverflowCap =
+  'maxQueuedBytes' | 'maxQueuedFrames' | 'maxFrameBytes' | 'sendFailed';
+
+/** Which bound tripped, plus the backlog held when it did. */
+export interface OutboundOverflowEvidence {
+  cap: OutboundOverflowCap;
+  queuedBytes: number;
+  queuedFrames: number;
+  maxQueuedBytes: number;
+  maxQueuedFrames: number;
+  maxFrameBytes: number;
+}
+
 export interface OutboundQueueOptions<T> {
   /** Hands one frame to the wire. Called in order, at most once per frame. */
   send: (frame: T) => void;
@@ -28,8 +42,11 @@ export interface OutboundQueueOptions<T> {
   getBufferedAmount: () => number;
   /** True while the socket can still accept sends. */
   isWritable: () => boolean;
-  /** The link is wedged; the caller should force a clean reconnect. */
-  onOverflow: () => void;
+  /**
+   * The link is wedged; the caller should force a clean reconnect. Receives the
+   * backlog measured before the drop, so the caller can report what tripped.
+   */
+  onOverflow: (evidence: OutboundOverflowEvidence) => void;
   softCapBytes?: number;
   maxQueuedBytes?: number;
   maxFrameBytes?: number;
@@ -44,7 +61,7 @@ export class OutboundBackpressureQueue<T> {
   private readonly byteLengthOf: (frame: T) => number;
   private readonly getBufferedAmount: () => number;
   private readonly isWritable: () => boolean;
-  private readonly onOverflow: () => void;
+  private readonly onOverflow: (evidence: OutboundOverflowEvidence) => void;
   private readonly softCapBytes: number;
   private readonly maxQueuedBytes: number;
   private readonly maxFrameBytes: number;
@@ -91,7 +108,7 @@ export class OutboundBackpressureQueue<T> {
     const bytes = this.byteLengthOf(frame);
     // A transport that cannot report bufferedAmount must not strand frames.
     if (!isFiniteNumber(bytes) || bytes < 0 || bytes > this.maxFrameBytes) {
-      this.failOverflow();
+      this.failOverflow('maxFrameBytes');
       return false;
     }
 
@@ -104,7 +121,9 @@ export class OutboundBackpressureQueue<T> {
     this.queuedBytesValue += bytes;
     this.queuedFramesValue += 1;
     if (this.queuedBytesValue > this.maxQueuedBytes || this.queuedFramesValue > this.maxQueuedFrames) {
-      this.failOverflow();
+      this.failOverflow(
+        this.queuedBytesValue > this.maxQueuedBytes ? 'maxQueuedBytes' : 'maxQueuedFrames'
+      );
       return false;
     }
     if (this.drainTimer === null) {
@@ -137,7 +156,7 @@ export class OutboundBackpressureQueue<T> {
       this.send(frame);
       return true;
     } catch (error) {
-      this.failOverflow();
+      this.failOverflow('sendFailed');
       return false;
     }
   }
@@ -183,12 +202,21 @@ export class OutboundBackpressureQueue<T> {
     }
   }
 
-  private failOverflow(): void {
+  private failOverflow(cap: OutboundOverflowCap): void {
     if (this.disposed || this.overflowed) {
       return;
     }
     this.overflowed = true;
+    // Snapshot before dropBacklog() zeroes the counters.
+    const evidence: OutboundOverflowEvidence = {
+      cap: cap,
+      queuedBytes: this.queuedBytesValue,
+      queuedFrames: this.queuedFramesValue,
+      maxQueuedBytes: this.maxQueuedBytes,
+      maxQueuedFrames: this.maxQueuedFrames,
+      maxFrameBytes: this.maxFrameBytes
+    };
     this.dropBacklog();
-    this.onOverflow();
+    this.onOverflow(evidence);
   }
 }

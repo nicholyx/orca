@@ -4,6 +4,7 @@ async function setupOpenCode2Status(ctx) {
   const controller = new AbortController();
   const client = { session: { get: (input, options) => ctx.session.get(input, options) } };
   const hooks = await OrcaOpenCodeStatusPlugin({ client });
+  if (!hooks.event) return async () => {};
   const promptRegistration = await ctx.session.hook("prompt", async (properties) => {
     await hooks.event({ event: { type: "session.next.prompt.admitted", properties } });
   });
@@ -23,8 +24,12 @@ async function setupOpenCode2Status(ctx) {
       } else if (type === "permission.asked") {
         properties = { ...properties, permission: properties.action, patterns: properties.resources };
       } else if (type === "form.created") {
-        type = "question.asked";
         const form = properties.form;
+        // Why: OpenCode 2 raises the same form for its own pickers and for MCP
+        // elicitations; only its question tool stamps kind "question", and only
+        // that form is a question the pane owner was actually asked.
+        if (!form || !form.metadata || form.metadata.kind !== "question") continue;
+        type = "question.asked";
         properties = {
           ...form,
           questions: form.fields.map((field) => ({
@@ -35,6 +40,8 @@ async function setupOpenCode2Status(ctx) {
           })),
         };
       } else if (type === "form.replied" || type === "form.cancelled") {
+        // A resolution for an ignored form is inert: the blocker key carries the
+        // form id, so it simply matches nothing.
         type = type === "form.replied" ? "question.replied" : "question.rejected";
         properties = { ...properties, requestID: properties.id };
       } else if (type === "session.text.started" || type === "session.text.delta" || type === "session.text.ended") {

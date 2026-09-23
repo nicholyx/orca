@@ -174,6 +174,8 @@ export type GlobalSettings = {
   terminalWindowsShell: string
   /** Optional shell executable for new terminals on macOS and Linux. */
   terminalDefaultShell?: string
+  /** Optional argv passed to the configured Unix shell for ordinary interactive panes. */
+  terminalDefaultShellArgs?: string[]
   /** Pins the WSL distro for terminals/agent scans instead of WSL's current global default. */
   terminalWindowsWslDistro?: string | null
   /** Account/auth location; auto follows the global Windows runtime while host/wsl pin it. */
@@ -414,6 +416,8 @@ export type GlobalSettings = {
   tabAutoGenerateTitle: boolean
   /** Why: pinned tabs can still be closed via keyboard/native-menu; this gates that behind a confirmation. Defaults on. */
   confirmClosePinnedTab: boolean
+  /** Why: preview tabs reuse one slot per group, so browsing replaces the open file; off makes every open its own tab. Defaults on. */
+  editorPreviewTabsEnabled: boolean
   /** When true, Orca requests local awake assertions while hook-reported agents are working. */
   keepComputerAwakeWhileAgentsRun: boolean
   /** Optional for mixed-version compatibility; the legacy boolean maps true to Auto. */

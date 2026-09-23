@@ -111,6 +111,9 @@ export function createRelayServer(
   const assignments = new RelayAssignmentStore(observedDatabase, options.now, {
     requireLiveCells: config.role === 'director',
     regionalRehomeCohortPercent: config.regionCorrectionCohortPercent ?? 0,
+    // The director runs in the database's region; only its rehome readers use this.
+    regionalRehomeDirectorRegion:
+      config.role === 'director' ? (config.region ?? RELAY_DEFAULT_REGION) : undefined,
     recordControlRenewal: (durationMs, outcome) =>
       observability.recordControlRenewal?.(durationMs, outcome)
   })
@@ -141,7 +144,7 @@ export function createRelayServer(
     idleRehome: (input) => {
       const now = (options.now ?? Date.now)()
       if (input.directorSafety.observedAt > now || now - input.directorSafety.observedAt > 60_000) {
-        return Promise.resolve({ outcome: 'deferred' })
+        return Promise.resolve({ outcome: 'deferred', reason: 'director-safety-stale' })
       }
       return sessions.idleRehome(input,
         () => assignments.commitIdleRegionalRehome(input, combineRegionalRehomeSafety(

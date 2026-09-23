@@ -10,7 +10,13 @@ import type { AgentStatusLegacyIngressCaller } from '../agent-status-legacy-ingr
 import type { ClaudeSubagentRoster } from '../claude-subagent-roster'
 import type { CodexSubagentRoster } from '../codex-subagent-roster'
 import type { CodexSubagentTranscriptState } from '../codex-subagent-transcript'
+import type { MuseSessionLogState } from '../muse-session-log'
 import type { AgentHookEventPayload, ToolSnapshot } from './listener-event'
+import {
+  moveOpenCodeSessionBindings,
+  unbindOpenCodeSessionsOfPane,
+  type OpenCodeSessionBinding
+} from './opencode-session-registry'
 
 /** Per-listener-instance caches needing per-PTY teardown; Orca's main process and the relay each get their own, never shared. */
 export type HookListenerState = {
@@ -46,6 +52,25 @@ export type HookListenerState = {
   codexLeadStateByPaneKey: Map<string, CodexLeadTurnState>
   /** Newest Grok turn per pane, used to reject end reports that arrive after a replacement prompt. */
   grokActiveTurnByPaneKey: Map<string, GrokActiveTurn>
+  /** Muse child-session filter and session-log cursor per pane. */
+  musePaneStateByPaneKey: Map<string, MusePaneState>
+  /**
+   * OpenCode session id -> owning pane, observed from the client side. The
+   * shared v2 server stamps every post with its own frozen pane, so ingest
+   * reattributes bound sessions before disposition. Not a state claim itself —
+   * it names no row — so paneHasStateClaims ignores it.
+   */
+  opencodeSessionPaneBySessionId: Map<string, OpenCodeSessionBinding>
+  /** Last launch token seen per pane; a rewritten shared-server post needs the bound pane's live token to pass its fence. */
+  lastLaunchTokenByPaneKey: Map<string, string>
+}
+
+export type MusePaneState = {
+  /** Internal reminder/subagent sessions; their hooks inherit the pane env and fire even after Stop. */
+  childSessionIds: Set<string>
+  log?: MuseSessionLogState
+  /** Muse emits PermissionRequest for auto-approved calls too; only Notification confirms a visible prompt. */
+  pendingApproval?: { toolName?: string; toolInput?: unknown }
 }
 
 export type GrokActiveTurn = {
@@ -103,7 +128,10 @@ export function createHookListenerState(
     codexSubagentRosterByPaneKey: new Map(),
     codexSubagentTranscriptByPaneKey: new Map(),
     codexLeadStateByPaneKey: new Map(),
-    grokActiveTurnByPaneKey: new Map()
+    grokActiveTurnByPaneKey: new Map(),
+    musePaneStateByPaneKey: new Map(),
+    opencodeSessionPaneBySessionId: new Map(),
+    lastLaunchTokenByPaneKey: new Map()
   }
   legacyStatusAdapterByState.set(state, adapter)
   return state
@@ -190,6 +218,9 @@ export function clearPaneCacheState(state: HookListenerState, paneKey: string): 
   state.codexSubagentTranscriptByPaneKey.delete(paneKey)
   state.codexLeadStateByPaneKey.delete(paneKey)
   state.grokActiveTurnByPaneKey.delete(paneKey)
+  state.musePaneStateByPaneKey.delete(paneKey)
+  unbindOpenCodeSessionsOfPane(state, paneKey)
+  deletePaneScopedCacheEntry(state.lastLaunchTokenByPaneKey, paneKey)
 }
 
 /** Does this pane still hold anything that can ASSERT a state — a stored row, or a Claude latch that
@@ -264,6 +295,9 @@ export function movePaneCacheState(
   movePaneScopedMapEntries(state.codexSubagentTranscriptByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.codexLeadStateByPaneKey, fromPaneKey, toPaneKey)
   movePaneScopedMapEntries(state.grokActiveTurnByPaneKey, fromPaneKey, toPaneKey)
+  movePaneScopedMapEntries(state.musePaneStateByPaneKey, fromPaneKey, toPaneKey)
+  moveOpenCodeSessionBindings(state, fromPaneKey, toPaneKey)
+  movePaneScopedMapEntries(state.lastLaunchTokenByPaneKey, fromPaneKey, toPaneKey)
 }
 
 export function clearPaneTurnCacheState(state: HookListenerState, paneKey: string): void {
@@ -313,4 +347,6 @@ export function clearAllListenerCaches(state: HookListenerState): void {
   state.codexSubagentTranscriptByPaneKey.clear()
   state.codexLeadStateByPaneKey.clear()
   state.grokActiveTurnByPaneKey.clear()
+  state.opencodeSessionPaneBySessionId.clear()
+  state.lastLaunchTokenByPaneKey.clear()
 }

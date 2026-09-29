@@ -127,6 +127,31 @@ fork 只维护鸿蒙端，但上游 `mobile/` 与 `src/` 的线协议是鸿蒙�
     `git diff --stat <上次出包的 sha> HEAD -- mobile-harmony/` 验证与上次出包**完全一致**，
     artifact 就仍然有效。为免歧义，合并后可以手动 `workflow_dispatch` 重跑一次让包挂在最新 main 上
     （鸿蒙 workflow 有 paths 过滤，纯上游合并**不会**自动触发）。
+11. **审计要用「导入清单」定界，不要凭眼睛看文件名**。harness 引用的参考模块就是端口的
+    权威镜像面，一条命令取出来：
+    `grep -rhoE "from '\.\./\.\./\.\./(mobile|src)/[^']+'" *.ts | sort -u`。
+    474 个提交的那次，逐文件比对这 19 个模块得到**恰好 3 个**变化——零遗漏、零猜测。
+    注意 `src/shared/host-names.ts` 与 `mobile/src/transport/host-names.ts` 是**两个不同文件**，
+    按文件名找会找错。
+12. **harness 看不见的那一类**：端到端套件驱动的是**自己仿真的桌面**（`desktop-peer.ts`），
+    所以桌面 RPC 处理器的改动它**碰不到**。这类只能靠读上游契约发现
+    （#27 的订阅参数与无 pty 快照就是这么漏出来的）。改完记得问一句：
+    「这条路径，套件到底走的是真代码还是我的假实现？」
+13. **本地 lint 工具必须与仓库锁定版本一致**，否则会**静默**给出不同结论：仓库锁 `^1.85.0`
+    而本机镜像只到 1.83.0 时，`max-lines` 的判定就与 CI 不同（#27 因此把
+    `verify-ui-state.ts` 推到 304 行却没在本地报错）。装不上就**手工按同一口径数有效行**
+    （非空、非注释），别默认本地绿等于 CI 绿。
+
+## 环境异常：到 GitHub 的通路断了怎么办（#27 实测）
+
+本机代理（`127.0.0.1:56134`）挂掉时，`all_proxy`/`http_proxy`/`https_proxy` 都指向它，
+表现为 `github.com:443` 直连超时。**但 SSH 22 端口仍然通**：
+
+- **git 走 SSH**：加临时 remote，别动使用者的 `origin`——
+  `git remote add ssh-origin git@github.com:<owner>/<repo>.git`（同理 `ssh-upstream`），
+  用完 `git remote remove` 删掉。
+- **`gh` 去掉代理**：`env -u https_proxy -u http_proxy -u all_proxy gh ...`
+  （`api.github.com:443` 直连是通的，只有 `github.com` 被挡）。
 
 ## 硬规则（踩坑沉淀，任何时候优先）
 
@@ -145,6 +170,13 @@ fork 只维护鸿蒙端，但上游 `mobile/` 与 `src/` 的线协议是鸿蒙�
 - workflow 改完先过 `actionlint`；`run:` 多行脚本开头 `set -euo pipefail`；
   markdown 反引号别放在单引号 echo 里（SC2016），用 quoted heredoc 写摘要。
 - 中文内容写完后全仓扫 U+FFFD（见 action-sync-images maintain-loop 同名规则）。
+- **`git add -A` 之后必须核对暂存区**。同步时用它会扫进本地产物：`.claude/worktrees/`
+  是个嵌套仓库，git 会记成 **gitlink**，让每次 clone 出现一个坏条目；还有 `.workbuddy/`
+  会话记录、`orca-hap/` 构建产物（#27 真实发生，已 `git rm --cached` + amend 修正）。
+  这三条路径已进 `.gitignore`，但规则本身要留着：**批量 add 不是「反正都在仓库里」的意思**，
+  提交前跑一次 `git diff --cached --name-only | grep -v <预期前缀>`。
+- **长提交信息写进文件用 `git commit -F`**，别塞进 `-m`：正文里的反引号与尖括号
+  （如 `` `<sha>` ``）会被 shell 解释，导致提交**静默失败**、只推了个空分支（#25 踩过）。
 
 ### lint 有两道门禁，本地都能复现（参考 #21）
 

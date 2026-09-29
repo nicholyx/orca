@@ -15,6 +15,7 @@ export const MOBILE_TUI_AGENT_LABELS: Record<TuiAgent, string> = TUI_AGENT_DISPL
 
 export const MOBILE_TUI_AGENT_FAVICON_DOMAINS: Partial<Record<TuiAgent, string>> = {
   openclaude: 'openclaude.gitlawb.com',
+  codebuddy: 'codebuddy.ai',
   grok: 'x.ai',
   copilot: 'github.com',
   opencode: 'opencode.ai',
@@ -22,8 +23,11 @@ export const MOBILE_TUI_AGENT_FAVICON_DOMAINS: Partial<Record<TuiAgent, string>>
   ante: 'antigma.ai',
   trae: 'www.trae.cn',
   muse: 'dev.meta.ai',
+  dsh: 'deepseek.com',
+  zcode: 'zcode.z.ai',
   omp: 'omp.sh',
   'prime-agent': 'primeintellect.ai',
+  qoder: 'qoder.com',
   gemini: 'gemini.google.com',
   antigravity: 'antigravity.google',
   goose: 'goose-docs.ai',

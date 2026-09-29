@@ -96,9 +96,16 @@ function sessionHoldingTurn(turnId: string | null): ReturnType<typeof sessionFor
   session.dispatchSequence = 1
   session.translator = {
     handle: vi.fn(),
+    openTurnInLiveProviderCycle: false,
     journalPrompts: { cancel: vi.fn(), resolve: vi.fn() },
     currentTurnId: turnId,
     flush: vi.fn(),
+    contextActivity: 0,
+    markContextActivity: vi.fn(),
+    subscribeContextUsageRequests: () => () => {},
+    recordContextReport: () => {},
+    modelMayHaveChanged: () => {},
+    modelWritten: () => {},
     pendingStreamedBlocks: 0,
     dispose: vi.fn()
   }
@@ -271,9 +278,16 @@ describe('Claude turn ownership', () => {
       session.dispatchSequence = 1
       session.translator = {
         handle: vi.fn(),
+        openTurnInLiveProviderCycle: false,
         journalPrompts: { cancel: vi.fn(), resolve: vi.fn() },
         currentTurnId: 'turn-1',
         flush: vi.fn(),
+        contextActivity: 0,
+        markContextActivity: vi.fn(),
+        subscribeContextUsageRequests: () => () => {},
+        recordContextReport: () => {},
+        modelMayHaveChanged: () => {},
+        modelWritten: () => {},
         pendingStreamedBlocks: 0,
         dispose: vi.fn()
       }

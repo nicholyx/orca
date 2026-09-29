@@ -15,6 +15,8 @@ export const RPC_METHOD_SESSION_TABS_SUBSCRIBE = 'session.tabs.subscribe';
 export const RPC_METHOD_SESSION_TABS_UNSUBSCRIBE = 'session.tabs.unsubscribe';
 export const RPC_METHOD_NATIVE_CHAT_SUBSCRIBE = 'nativeChat.subscribe';
 export const RPC_METHOD_NATIVE_CHAT_UNSUBSCRIBE = 'nativeChat.unsubscribe';
+export const RPC_METHOD_AGENT_SESSION_SUBSCRIBE = 'agentSession.subscribe';
+export const RPC_METHOD_AGENT_SESSION_UNSUBSCRIBE = 'agentSession.unsubscribe';
 export const RPC_METHOD_BROWSER_SCREENCAST = 'browser.screencast';
 export const RPC_METHOD_BROWSER_SCREENCAST_UNSUBSCRIBE = 'browser.screencast.unsubscribe';
 export const RPC_METHOD_CLIENT_EVENTS_SUBSCRIBE = 'runtime.clientEvents.subscribe';
@@ -74,7 +76,8 @@ export function buildTerminalUnsubscribeParams(
  */
 export function buildStreamUnsubscribe(
   method: string,
-  params: Object | null
+  params: Object | null,
+  requestId: string | null
 ): RpcStreamUnsubscribe | null {
   const record = asRecord(params);
   if (record === null) {
@@ -87,8 +90,27 @@ export function buildStreamUnsubscribe(
     }
     const unsubscribeParams: Record<string, Object> = {};
     unsubscribeParams.worktree = worktree;
+    if (requestId !== null) {
+      unsubscribeParams.subscriptionId = requestId;
+    }
     const rpc: RpcStreamUnsubscribe = {
       method: RPC_METHOD_SESSION_TABS_UNSUBSCRIBE,
+      params: unsubscribeParams
+    };
+    return rpc;
+  }
+  if (method === RPC_METHOD_AGENT_SESSION_SUBSCRIBE) {
+    // The host keys each transcript stream by its frame id; without it every
+    // stream of the session on this socket would end.
+    const sessionId = asString(record.sessionId);
+    if (sessionId === null || requestId === null) {
+      return null;
+    }
+    const unsubscribeParams: Record<string, Object> = {};
+    unsubscribeParams.sessionId = sessionId;
+    unsubscribeParams.subscriptionId = requestId;
+    const rpc: RpcStreamUnsubscribe = {
+      method: RPC_METHOD_AGENT_SESSION_UNSUBSCRIBE,
       params: unsubscribeParams
     };
     return rpc;

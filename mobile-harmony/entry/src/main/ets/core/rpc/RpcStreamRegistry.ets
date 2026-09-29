@@ -32,6 +32,7 @@ import {
 } from './RpcStreamUnsubscribe';
 import { TerminalStreamRouter, TerminalStreamEvent } from './TerminalStreamRouter';
 
+export const STREAM_RESULT_TYPE_SUBSCRIBED = 'subscribed';
 export const STREAM_RESULT_TYPE_END = 'end';
 export const STREAM_RESULT_TYPE_ERROR = 'error';
 export const STREAM_RESULT_TYPE_SCROLLBACK = 'scrollback';
@@ -281,7 +282,7 @@ export class RpcStreamRegistry {
         this.sendRpc('terminal.unsubscribe', params);
       }
     } else {
-      const unsubscribe = buildStreamUnsubscribe(stream.method, stream.params);
+      const unsubscribe = buildStreamUnsubscribe(stream.method, stream.params, id);
       if (unsubscribe !== null) {
         this.sendRpc(unsubscribe.method, unsubscribe.params);
       }

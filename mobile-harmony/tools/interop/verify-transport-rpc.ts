@@ -139,20 +139,31 @@ export function runRpcShapeSections(): void {
       ['browser.screencast', { tab: 1 }],
       ['unknown.method', { x: 1 }],
       [undefined, { x: 1 }],
-      ['session.tabs.subscribe', null]
+      ['session.tabs.subscribe', null],
+      // agentSession keys each transcript stream by its frame id, so the request
+      // id is part of the unsubscribe rather than optional decoration.
+      ['agentSession.subscribe', { sessionId: 's1' }],
+      ['agentSession.subscribe', {}],
+      ['agentSession.subscribe', null],
+      ['agentSession.subscribe', { sessionId: 7 }]
     ]
-    for (const [method, params] of streamCorpus) {
-      // SAFETY: the corpus deliberately carries an `undefined` method to pin how the
-      // reference refuses it, and the ArkTS signature wants a string. `as` is erased at
-      // runtime, so the undefined still reaches the function under test.
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: see above; the undefined entry must reach the builder unchanged.
-      const ours = hUnsub.buildStreamUnsubscribe(method as string, params)
-      const reference = buildStreamUnsubscribe(method, params)
-      check(
-        `stream unsubscribe matches for ${method} ${JSON.stringify(params)}`,
-        jsonEqual(ours, reference),
-        `${JSON.stringify(ours)} vs ${JSON.stringify(reference)}`
-      )
+    // Every corpus entry runs twice: with a request id and without. session.tabs
+    // echoes it only when it has one, and agentSession cannot unsubscribe at all
+    // without it, so a single pass would leave one of the two paths unpinned.
+    for (const requestId of ['rpc-9', null]) {
+      for (const [method, params] of streamCorpus) {
+        // SAFETY: the corpus deliberately carries an `undefined` method to pin how the
+        // reference refuses it, and the ArkTS signature wants a string. `as` is erased at
+        // runtime, so the undefined still reaches the function under test.
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: see above; the undefined entry must reach the builder unchanged.
+        const ours = hUnsub.buildStreamUnsubscribe(method as string, params, requestId)
+        const reference = buildStreamUnsubscribe(method, params, requestId ?? undefined)
+        check(
+          `stream unsubscribe matches for ${method} ${JSON.stringify(params)} requestId=${requestId}`,
+          jsonEqual(ours, reference),
+          `${JSON.stringify(ours)} vs ${JSON.stringify(reference)}`
+        )
+      }
     }
 
     const readyCorpus: [string, string][] = [

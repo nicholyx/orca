@@ -190,6 +190,33 @@ section('UI-4. terminal buffer semantics')
   check('opening a terminal subscribes on the wire', peer !== null && peer.terminalSubscribeParams.length === 1)
   check('the active terminal id is exposed', env.connection.activeTerminalId() === 'term-1')
 
+  // The shape of these params is a wire contract with the host's schema, and
+  // nothing else here reads it: the end-to-end suite drives RpcClient itself and
+  // so asserts only the literals it sent. That is how top-level cols/rows — a key
+  // the host silently drops, leaving the PTY unwrapped to the phone — survived.
+  {
+    const sent = peer === null ? {} : (peer.terminalSubscribeParams[0] ?? {})
+    const viewport = asRecord(sent.viewport)
+    check(
+      'the viewport rides in viewport, not top-level cols/rows',
+      viewport !== null && viewport.cols === 80 && viewport.rows === 24,
+      JSON.stringify(sent)
+    )
+    check('no unknown top-level cols/rows is sent', sent.cols === undefined && sent.rows === undefined)
+    const client = asRecord(sent.client)
+    check(
+      'the client is declared mobile, so the host serves mobile behaviour',
+      client !== null && asString(client.type) === 'mobile' && typeof client.id === 'string',
+      JSON.stringify(sent.client)
+    )
+    const capabilities = asRecord(sent.capabilities)
+    check(
+      'the binary terminal stream is advertised, or the host refuses a mobile subscriber',
+      capabilities !== null && capabilities.terminalBinaryStream === 1,
+      JSON.stringify(sent.capabilities)
+    )
+  }
+
   // A whole-screen snapshot REPLACES the buffer.
   peer?.sendScrollback('term-1', 'alpha\r\nbeta', 'scrollback')
   await waitFor('scrollback to land', () => env.connection.terminal().length >= 2)

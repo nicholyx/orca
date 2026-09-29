@@ -20,14 +20,14 @@ import { ConnectionLogEntry } from '../core/rpc/ConnectionLog';
 import { RpcClient } from '../transport/RpcClient';
 import { RpcResponse } from '../core/rpc/RpcProtocol';
 import { RPC_METHOD_TERMINAL_SUBSCRIBE } from '../core/rpc/RpcStreamUnsubscribe';
-import { STREAM_RESULT_TYPE_END } from '../core/rpc/RpcStreamRegistry';
+import { STREAM_RESULT_TYPE_END, STREAM_RESULT_TYPE_SUBSCRIBED } from '../core/rpc/RpcStreamRegistry';
 import {
   TERMINAL_EVENT_DATA,
   TERMINAL_EVENT_ERROR,
   TERMINAL_EVENT_RESIZED,
   TERMINAL_EVENT_SCROLLBACK
 } from '../core/rpc/TerminalStreamRouter';
-import { asArray, asRecord, asString } from '../core/json/JsonValue';
+import { asArray, asRecord, asString, asStringArray } from '../core/json/JsonValue';
 import { AssetDeviceTokenStore } from '../platform/AssetDeviceTokenStore';
 import { DirectClientArgs, buildDirectClientOptions } from '../platform/DirectRpcSocketFactory';
 import { harmonyRandomBytes, newHostId } from '../platform/HarmonyRandom';
@@ -390,11 +390,21 @@ export class OrcaConnection {
     this.terminalLines = [];
     const params: Record<string, Object> = {};
     params.terminal = terminalId;
-    params.cols = cols;
-    params.rows = rows;
+    // The viewport is a named field, not top-level cols/rows: the host's schema
+    // drops an unknown key, which silently left the PTY unwrapped to the phone.
+    const viewport: Record<string, Object> = {};
+    viewport.cols = cols;
+    viewport.rows = rows;
+    params.viewport = viewport;
     const clientRef: Record<string, Object> = {};
     clientRef.id = `harmony-${newHostId()}`;
+    // The host refuses a mobile subscriber that cannot take the binary stream,
+    // and `client.type` defaults to 'desktop' when it is absent.
+    clientRef.type = 'mobile';
     params.client = clientRef;
+    const capabilities: Record<string, Object> = {};
+    capabilities.terminalBinaryStream = 1;
+    params.capabilities = capabilities;
     const unsubscribe = this.client.subscribe(
       RPC_METHOD_TERMINAL_SUBSCRIBE,
       params,
@@ -448,6 +458,16 @@ export class OrcaConnection {
       return;
     }
     const type = asString(record.type);
+    if (type === STREAM_RESULT_TYPE_SUBSCRIBED) {
+      // A host with no live pty answers with the tail snapshot carried on the
+      // subscribed result, and never follows it with `end` — this is the only
+      // place the buffer can learn that scrollback.
+      const lines = asStringArray(record.lines);
+      if (lines !== null) {
+        this.replaceTerminalText(lines.join('\n'));
+      }
+      return;
+    }
     if (type === TERMINAL_EVENT_DATA) {
       const chunk = asString(record.chunk);
       if (chunk !== null) {

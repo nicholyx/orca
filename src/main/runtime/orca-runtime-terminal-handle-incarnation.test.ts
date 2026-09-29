@@ -169,12 +169,16 @@ describe('runtime terminal handle incarnation fencing', () => {
     })
     expect(replacement?.handle).not.toBe(staleHandle)
     await expect(runtime.readTerminal(staleHandle)).rejects.toThrow('terminal_handle_stale')
-    await expect(runtime.sendTerminal(staleHandle, { text: 'stale input' })).rejects.toThrow(
-      'terminal_handle_stale'
-    )
+    await expect(
+      runtime.sendTerminal(staleHandle, { text: 'stale input' }, { inputKind: 'driving' })
+    ).rejects.toThrow('terminal_handle_stale')
 
     await expect(
-      runtime.sendTerminal(replacement!.handle, { text: 'replacement input' })
+      runtime.sendTerminal(
+        replacement!.handle,
+        { text: 'replacement input' },
+        { inputKind: 'driving' }
+      )
     ).resolves.toMatchObject({
       accepted: true,
       handle: replacement!.handle
@@ -270,24 +274,14 @@ describe('resolveTerminalHandleByProcessIncarnation direct fencing', () => {
     })
   }
 
-  /** Call the private resolveTerminalHandleByProcessIncarnation on the runtime. */
   function resolve(
     runtime: OrcaRuntimeService,
     processIncarnation: string,
     serializedHostScope: string | null
   ): string | null {
-    return (
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Test fixture crosses a private/runtime boundary with a verified shape.
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Test fixture crosses a private/runtime boundary with a verified shape.
-      (
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Test fixture crosses a private/runtime boundary with a verified shape.
-        runtime as unknown as {
-          resolveTerminalHandleByProcessIncarnation(
-            processIncarnation: string,
-            serializedHostScope: string | null
-          ): string | null
-        }
-      ).resolveTerminalHandleByProcessIncarnation(processIncarnation, serializedHostScope)
+    return runtime.resolveTerminalHandleByProcessIncarnation(
+      processIncarnation,
+      serializedHostScope
     )
   }
 

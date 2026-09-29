@@ -1,13 +1,14 @@
 // @vitest-environment happy-dom
 
 import { act, renderHook } from '@testing-library/react'
-import * as rowContent from './native-chat-row-content'
+import * as rowContent from '../../../../shared/native-chat-row-content'
 import { describe, expect, it, vi } from 'vitest'
 import type { NativeChatMessage } from '../../../../shared/native-chat-types'
 import type { NativeChatResolvedPrompt } from './native-chat-resolution-receipt'
 import type { NativeChatTurnDiff } from './native-chat-turn-diffs'
 import { buildNativeChatTranscriptSlots } from './native-chat-transcript-slots'
 import { useNativeChatMessageRail } from './use-native-chat-message-rail'
+import { selectNativeChatActiveTurnKey } from '../../../../shared/native-chat-turn-status'
 
 function message(id: string, role: NativeChatMessage['role']): NativeChatMessage {
   return {
@@ -31,12 +32,10 @@ function slotsOf(messages: NativeChatMessage[]) {
   return buildNativeChatTranscriptSlots({
     messages,
     turnKeys,
-    latestUserIndex: messages.findLastIndex((entry) => entry.role === 'user'),
-    currentTurnKey: undefined,
+    activeTurnKey: selectNativeChatActiveTurnKey(messages),
     receipts: new Map<string, NativeChatResolvedPrompt>(),
     turnStatuses: { active: null, completedByTurn: {} },
     turnDiffs: new Map<string, NativeChatTurnDiff>(),
-    showTurnStatus: false,
     expandedTurnKeys: new Set<string>(),
     isWorking: false,
     lifecycleWorking: false
@@ -134,5 +133,29 @@ describe('message rail hook', () => {
       })
     )
     expect(short.current.visible).toBe(false)
+  })
+
+  it('maps user messages above the loaded window from the outline, before the loaded ones', () => {
+    const scrollRef = { current: document.createElement('div') }
+    const outline = Array.from({ length: 30 }, (_, index) => ({
+      id: `older-${index}`,
+      text: `older prompt ${index}`,
+      hasImages: false
+    }))
+    const loaded = [message('u1', 'user'), message('a1', 'assistant')]
+    const { result } = renderHook(() =>
+      useNativeChatMessageRail({ scrollRef, slots: slotsOf(loaded), virtualItems: [], outline })
+    )
+    // One loaded prompt alone would hide the rail; the outline is what makes it a map.
+    expect(result.current.visible).toBe(true)
+    expect(result.current.items.map((item) => item.id)).toEqual([
+      ...outline.map((entry) => entry.id),
+      'u1'
+    ])
+    expect(result.current.items.at(0)).toMatchObject({ slotIndex: null, text: 'older prompt 0' })
+    expect(result.current.items.at(-1)).toMatchObject({ id: 'u1', slotIndex: 0 })
+    // The sampled ticks keep both ends of the whole thread, not of the loaded page.
+    expect(result.current.ticks.at(0)?.id).toBe('older-0')
+    expect(result.current.ticks.at(-1)?.id).toBe('u1')
   })
 })

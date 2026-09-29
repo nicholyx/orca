@@ -52,11 +52,13 @@ function slot(id: string): NativeChatTranscriptSlot {
     },
     turnKey: undefined,
     activeTurnIsWorking: false,
+    trailingRun: false,
     receipt: undefined,
     status: undefined,
     folded: false,
     turnFolds: false,
     turnDiff: undefined,
+    subagentLabel: undefined,
     estimatedHeight: 48
   }
 }

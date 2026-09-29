@@ -5,7 +5,7 @@
  * belongs in the same suite and reports through the same counters.
  */
 import { check, section } from './harness'
-import { ENDPOINT, createEnvironment, desktopPublicKeyB64, pairingCode, waitFor } from './ui-state-environment'
+import { ENDPOINT, createEnvironment, desktopPublicKeyB64, pairingCode } from './ui-state-environment'
 
 export async function runUnreadableStateScenario(): Promise<void> {
   // ---------------------------------------------------------------------------
